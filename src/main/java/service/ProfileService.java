@@ -8,190 +8,131 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-
 public class ProfileService {
-
     private static final int MIN_NAME_LENGTH = 2;
     private static final int MAX_NAME_LENGTH = 50;
 
-    // Dependency — ProfileRepository
-
     private final ProfileRepository profileRepository;
-
-    // Constructor
+    private Profile activeProfile;
 
     public ProfileService(ProfileRepository profileRepository) {
         this.profileRepository = profileRepository;
     }
 
-    // CREATE
-  
-    public Profile createProfile(String name, Currency defaultCurrency) {
-
-        // --- Validate name ---
-
-        // Check for null or blank (handles "", "   ", and null all at once)
-        if (name == null || name.trim().isEmpty()) {
-            System.out.println("Profile name cannot be empty.");
-            return null;
-        }
-
-        // Normalize — remove leading/trailing spaces before further checks
-        String trimmedName = name.trim();
-
-        // Check minimum length
-        if (trimmedName.length() < MIN_NAME_LENGTH) {
-            System.out.println("Profile name must be at least " + MIN_NAME_LENGTH + " characters.");
-            return null;
-        }
-
-        // Check maximum length
-        if (trimmedName.length() > MAX_NAME_LENGTH) {
-            System.out.println("Profile name must be at most " + MAX_NAME_LENGTH + " characters.");
-            return null;
-        }
-
-        // Check for duplicate — ask the repository if a profile with this name exists
-        // We compare in lowercase so "Alex" and "alex" are treated as the same name
-        if (profileExists(trimmedName)) {
-            System.out.println("A profile with the name '" + trimmedName + "' already exists.");
-            return null;
-        }
-
-        // --- Validate currency ---
-
-        if (defaultCurrency == null) {
-            System.out.println("Default currency must be selected.");
-            return null;
-        }
-
-        // --- All validations passed — build and save the profile ---
-
-        // createdAt is always set here in the service, never supplied by the user
-        Profile newProfile = new Profile(trimmedName, defaultCurrency, LocalDateTime.now());
-
-        Profile savedProfile = profileRepository.save(newProfile);
-
+    public Profile save(Profile profile) {
+        Profile savedProfile = createProfile(profile.getName(), profile.getDefaultCurrency());
         if (savedProfile == null) {
-            System.out.println("Failed to save profile. Please try again.");
-            return null;
+            throw new IllegalArgumentException("Profile could not be saved.");
         }
-
-        System.out.println("Profile '" + trimmedName + "' created successfully.");
         return savedProfile;
     }
 
-    // READ — single profile
-
-    public Profile getProfileById(Integer id) {
-
-        if (id == null) {
-            System.out.println("Profile id cannot be null.");
-            return null;
+    public Profile createProfile(String name, Currency defaultCurrency) {
+        String trimmedName = validateName(name);
+        if (defaultCurrency == null) {
+            throw new IllegalArgumentException("Default currency must be selected.");
+        }
+        if (profileExists(trimmedName)) {
+            throw new IllegalArgumentException("A profile with this name already exists.");
         }
 
-        Optional<Profile> result = profileRepository.findById(id);
-
-        if (result.isEmpty()) {
-            System.out.println("No profile found with id: " + id);
-            return null;
-        }
-
-        return result.get();
+        Profile savedProfile = profileRepository.save(new Profile(trimmedName, defaultCurrency, LocalDateTime.now()));
+        activeProfile = savedProfile;
+        return savedProfile;
     }
 
-    // READ — all profiles
-    
-    public List<Profile> getAllProfiles() {
+    public List<Profile> findAll() {
         return profileRepository.findAll();
     }
 
-    // UPDATE
-    
+    public List<Profile> getAllProfiles() {
+        return findAll();
+    }
+
+    public Optional<Profile> findById(Integer id) {
+        return profileRepository.findById(id);
+    }
+
+    public Profile getProfileById(Integer id) {
+        return findById(id).orElse(null);
+    }
+
+    public Optional<Profile> getActiveProfile() {
+        return Optional.ofNullable(activeProfile);
+    }
+
+    public Profile requireActiveProfile() {
+        return getActiveProfile()
+                .orElseThrow(() -> new IllegalStateException("Create or select a profile before continuing."));
+    }
+
+    public void setActiveProfile(Profile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("Profile is required.");
+        }
+        activeProfile = profile;
+    }
+
+    public void update(Profile profile) {
+        updateProfile(profile.getId(), profile.getName(), profile.getDefaultCurrency());
+    }
+
     public boolean updateProfile(Integer id, String newName, Currency newCurrency) {
-
-        // Step 1 — fetch the existing profile first
-        // Never call update() without doing this — the repository assumes the
-        // entity already exists and will silently do nothing if it doesn't.
-        Optional<Profile> result = profileRepository.findById(id);
-
-        if (result.isEmpty()) {
-            System.out.println("Cannot update — no profile found with id: " + id);
-            return false;
+        if (id == null) {
+            throw new IllegalArgumentException("Profile id cannot be null.");
         }
 
-        // Get the current profile object with all its existing field values
-        Profile existingProfile = result.get();
+        Profile existingProfile = profileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No profile found with id: " + id));
 
-        // Step 2 & 3 — validate and apply new name if provided
         if (newName != null) {
-
-            String trimmedName = newName.trim();
-
-            if (trimmedName.isEmpty()) {
-                System.out.println("Profile name cannot be empty.");
-                return false;
-            }
-
-            if (trimmedName.length() < MIN_NAME_LENGTH) {
-                System.out.println("Profile name must be at least " + MIN_NAME_LENGTH + " characters.");
-                return false;
-            }
-
-            if (trimmedName.length() > MAX_NAME_LENGTH) {
-                System.out.println("Profile name must be at most " + MAX_NAME_LENGTH + " characters.");
-                return false;
-            }
-
-            // Check duplicate only if the name is actually changing
+            String trimmedName = validateName(newName);
             if (!trimmedName.equalsIgnoreCase(existingProfile.getName()) && profileExists(trimmedName)) {
-                System.out.println("A profile with the name '" + trimmedName + "' already exists.");
-                return false;
+                throw new IllegalArgumentException("A profile with this name already exists.");
             }
-
             existingProfile.setName(trimmedName);
         }
-
-        // Apply new currency if provided
         if (newCurrency != null) {
             existingProfile.setDefaultCurrency(newCurrency);
         }
 
-        // Step 4 — pass the modified object to the repository
-        // createdAt is intentionally not touched — it never changes after creation
         profileRepository.update(existingProfile);
-
-        System.out.println("Profile updated successfully.");
+        activeProfile = existingProfile;
         return true;
     }
 
-    // DELETE
+    public void deleteById(Integer id) {
+        deleteProfile(id);
+    }
 
     public boolean deleteProfile(Integer id) {
-
         if (id == null) {
-            System.out.println("Profile id cannot be null.");
-            return false;
+            throw new IllegalArgumentException("Profile id cannot be null.");
         }
-
-        // Verify the profile exists before attempting to delete
-        Optional<Profile> result = profileRepository.findById(id);
-
-        if (result.isEmpty()) {
-            System.out.println("Cannot delete — no profile found with id: " + id);
-            return false;
-        }
-
+        profileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No profile found with id: " + id));
         profileRepository.deleteById(id);
-
-        System.out.println("Profile deleted successfully.");
+        if (activeProfile != null && id.equals(activeProfile.getId())) {
+            activeProfile = null;
+        }
         return true;
     }
 
-    // PRIVATE HELPERS
+    private String validateName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Profile name cannot be empty.");
+        }
+        String trimmedName = name.trim();
+        if (trimmedName.length() < MIN_NAME_LENGTH) {
+            throw new IllegalArgumentException("Profile name must be at least " + MIN_NAME_LENGTH + " characters.");
+        }
+        if (trimmedName.length() > MAX_NAME_LENGTH) {
+            throw new IllegalArgumentException("Profile name must be at most " + MAX_NAME_LENGTH + " characters.");
+        }
+        return trimmedName;
+    }
 
     private boolean profileExists(String name) {
-        Optional<Profile> result = profileRepository.findByName(name.trim().toLowerCase());
-        return result.isPresent();
+        return profileRepository.findByName(name).isPresent();
     }
 }
