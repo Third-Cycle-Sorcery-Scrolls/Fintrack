@@ -30,19 +30,22 @@ public class ProfileSetupUI {
 
     // MAIN MENU
 
-    public void start() {
+    public Profile start() {
         System.out.println("========================================");
         System.out.println("       Welcome to Fintrack Setup        ");
         System.out.println("========================================");
-
+ 
+        // Tracks the profile the user creates or selects during this session
+        Profile activeProfile = null;
+ 
         boolean running = true;
-
+ 
         while (running) {
             printMainMenu();
             int choice = readIntInput("Enter your choice: ");
-
+ 
             switch (choice) {
-                case 1 -> handleCreateProfile();
+                case 1 -> activeProfile = handleCreateProfile();
                 case 2 -> handleViewAllProfiles();
                 case 3 -> handleUpdateProfile();
                 case 4 -> handleDeleteProfile();
@@ -53,6 +56,8 @@ public class ProfileSetupUI {
                 default -> System.out.println("Invalid choice. Please enter a number between 1 and 5.");
             }
         }
+ 
+        return activeProfile;
     }
 
     // Print main menu options
@@ -72,28 +77,30 @@ public class ProfileSetupUI {
 
     // HANDLE CREATE
     
-    private void handleCreateProfile() {
+    private Profile handleCreateProfile() {
         System.out.println("\n--- Create New Profile ---");
-
+ 
         // Collect name
         String name = readStringInput("Enter profile name: ");
-
+ 
         // Collect currency via numbered list
         Currency selectedCurrency = readCurrencyInput();
-
+ 
         if (selectedCurrency == null) {
             System.out.println("Invalid currency selection. Profile creation cancelled.");
-            return;
+            return null;
         }
-
+ 
         // Delegate to service — service handles all validation
         Profile created = profileService.createProfile(name, selectedCurrency);
-
+ 
         if (created != null) {
             System.out.println("\n✔ Profile created successfully!");
             printProfileDetails(created);
         }
         // If null, ProfileService already printed the reason
+ 
+        return created;
     }
 
     // HANDLE VIEW ALL
