@@ -43,6 +43,14 @@ public class Profile {
         this.defaultCurrency = defaultCurrency;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     @Override
     public String toString() {
         return "Profile{" +
