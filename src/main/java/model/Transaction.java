@@ -9,14 +9,14 @@ public class Transaction {
     private int categoryId;
     private BigDecimal amount;
     private TransactionType type;
-    private CurrencyType currency;
+    private Currency currency;
     private String description;
     private LocalDate transactionDate;
 
     public Transaction() {
     }
 
-    public Transaction(int id, int profileId, int categoryId, BigDecimal amount, TransactionType type, CurrencyType currency, String description, LocalDate transactionDate) {
+    public Transaction(int id, int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
         this.id = id;
         this.profileId = profileId;
         this.categoryId = categoryId;
@@ -27,7 +27,7 @@ public class Transaction {
         this.transactionDate = transactionDate;
     }
 
-    public Transaction(int profileId, int categoryId, BigDecimal amount, TransactionType type, CurrencyType currency, String description, LocalDate transactionDate) {
+    public Transaction(int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
         this.profileId = profileId;
         this.categoryId = categoryId;
         this.amount = amount;
@@ -77,11 +77,11 @@ public class Transaction {
         this.type = type;
     }
 
-    public CurrencyType getCurrency() {
+    public Currency getCurrency() {
         return currency;
     }
 
-    public void setCurrency(CurrencyType currency) {
+    public void setCurrency(Currency currency) {
         this.currency = currency;
     }
 
@@ -103,15 +103,6 @@ public class Transaction {
 
     @Override
     public String toString() {
-        return "Transaction{" +
-                "id=" + id +
-                ", profileId=" + profileId +
-                ", categoryId=" + categoryId +
-                ", amount=" + amount +
-                ", type=" + type +
-                ", currency=" + currency +
-                ", description='" + description + '\'' +
-                ", transactionDate=" + transactionDate +
-                '}';
+        return transactionDate + " - " + type + " " + amount + " " + currency + " - " + description;
     }
 }

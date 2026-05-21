@@ -1,25 +1,25 @@
 package model;
 
 public enum Currency {
-
-    USD("US Dollar",          "$"),
-    EUR("Euro",               "€"),
-    GBP("British Pound",      "£"),
-    ETB("Ethiopian Birr",     "Br");
-
-    // Fields
+    ETB("Ethiopian Birr", "Br"),
+    USD("US Dollar", "$"),
+    EUR("Euro", "EUR"),
+    GBP("British Pound", "GBP"),
+    JPY("Japanese Yen", "JPY"),
+    CHF("Swiss Franc", "CHF"),
+    CAD("Canadian Dollar", "CAD"),
+    AUD("Australian Dollar", "AUD"),
+    CNY("Chinese Yuan", "CNY"),
+    INR("Indian Rupee", "INR"),
+    BRL("Brazilian Real", "BRL");
 
     private final String fullName;
-    private final String symbol;     
-
-    //Constructor
+    private final String symbol;
 
     Currency(String fullName, String symbol) {
         this.fullName = fullName;
-        this.symbol   = symbol;
+        this.symbol = symbol;
     }
-
-    // Getters
 
     public String getFullName() {
         return fullName;
@@ -31,7 +31,6 @@ public enum Currency {
 
     @Override
     public String toString() {
-        return name() + " – " + fullName + " (" + symbol + ")";
-        // Example output:  USD – US Dollar ($)
+        return name() + " - " + fullName + " (" + symbol + ")";
     }
 }

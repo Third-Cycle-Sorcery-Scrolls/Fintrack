@@ -1,29 +1,38 @@
 package model;
 
+import java.time.LocalDateTime;
+
 public class Profile {
-    private int id;
+    private Integer id;
     private String name;
-    private CurrencyType defaultCurrency;
+    private Currency defaultCurrency;
+    private LocalDateTime createdAt;
 
     public Profile() {
     }
 
-    public Profile(int id, String name, CurrencyType defaultCurrency) {
+    public Profile(String name, Currency defaultCurrency) {
+        this(name, defaultCurrency, LocalDateTime.now());
+    }
+
+    public Profile(String name, Currency defaultCurrency, LocalDateTime createdAt) {
+        this.name = name;
+        this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
+    }
+
+    public Profile(Integer id, String name, Currency defaultCurrency, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
         this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
     }
 
-    public Profile(String name, CurrencyType defaultCurrency) {
-        this.name = name;
-        this.defaultCurrency = defaultCurrency;
-    }
-
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -35,11 +44,11 @@ public class Profile {
         this.name = name;
     }
 
-    public CurrencyType getDefaultCurrency() {
+    public Currency getDefaultCurrency() {
         return defaultCurrency;
     }
 
-    public void setDefaultCurrency(CurrencyType defaultCurrency) {
+    public void setDefaultCurrency(Currency defaultCurrency) {
         this.defaultCurrency = defaultCurrency;
     }
 
@@ -53,10 +62,6 @@ public class Profile {
 
     @Override
     public String toString() {
-        return "Profile{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", defaultCurrency=" + defaultCurrency +
-                '}';
+        return name + " (" + defaultCurrency + ")";
     }
 }

@@ -45,10 +45,6 @@ public class Tag {
 
     @Override
     public String toString() {
-        return "Tag{" +
-                "id=" + id +
-                ", profileId=" + profileId +
-                ", name='" + name + '\'' +
-                '}';
+        return name;
     }
 }

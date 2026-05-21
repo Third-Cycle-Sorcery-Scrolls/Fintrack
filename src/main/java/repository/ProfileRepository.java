@@ -4,181 +4,124 @@ import config.DBConnection;
 import model.Currency;
 import model.Profile;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class ProfileRepository implements Repository<Profile, Integer> {
+    private static final String SQL_INSERT = "INSERT INTO profiles (name, default_currency, created_at) VALUES (?, ?, ?)";
+    private static final String SQL_FIND_ALL = "SELECT id, name, default_currency, created_at FROM profiles ORDER BY name";
+    private static final String SQL_FIND_BY_ID = "SELECT id, name, default_currency, created_at FROM profiles WHERE id = ?";
+    private static final String SQL_FIND_BY_NAME = "SELECT id, name, default_currency, created_at FROM profiles WHERE LOWER(name) = LOWER(?)";
+    private static final String SQL_UPDATE = "UPDATE profiles SET name = ?, default_currency = ? WHERE id = ?";
+    private static final String SQL_DELETE = "DELETE FROM profiles WHERE id = ?";
 
-    // SQL constants
-
-    private static final String SQL_INSERT =
-            "INSERT INTO profiles (name, default_currency, created_at) VALUES (?, ?, ?)";
-
-    private static final String SQL_FIND_ALL =
-            "SELECT id, name, default_currency, created_at FROM profiles";
-
-    private static final String SQL_FIND_BY_ID =
-            "SELECT id, name, default_currency, created_at FROM profiles WHERE id = ?";
-
-    private static final String SQL_FIND_BY_NAME =
-            "SELECT id, name, default_currency, created_at FROM profiles WHERE name = ?";
-
-    private static final String SQL_UPDATE =
-            "UPDATE profiles SET name = ?, default_currency = ?, created_at = ? WHERE id = ?";
-
-    private static final String SQL_DELETE =
-            "DELETE FROM profiles WHERE id = ?";
-
-    // Helper — mapRow()
-    
-    private Profile mapRow(ResultSet rs) throws SQLException {
-        Integer       id              = rs.getInt("id");
-        String        name            = rs.getString("name");
-        Currency      defaultCurrency = Currency.valueOf(rs.getString("default_currency"));
-        LocalDateTime createdAt       = rs.getTimestamp("created_at").toLocalDateTime();
-
-        return new Profile(id, name, defaultCurrency, createdAt);
-    }
-
-  
-    // save()
-  
     @Override
     public Profile save(Profile profile) {
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS);
+        if (profile.getCreatedAt() == null) {
+            profile.setCreatedAt(LocalDateTime.now());
+        }
 
-            stmt.setString   (1, profile.getName());
-            stmt.setString   (2, profile.getDefaultCurrency().name()); // stores "USD", "ETB", etc.
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, profile.getName());
+            stmt.setString(2, profile.getDefaultCurrency().name());
             stmt.setTimestamp(3, Timestamp.valueOf(profile.getCreatedAt()));
-
             stmt.executeUpdate();
 
-            // Retrieve the auto-generated id assigned by the database
-            ResultSet generatedKeys = stmt.getGeneratedKeys();
-            if (generatedKeys.next()) {
-                profile.setId(generatedKeys.getInt(1));
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    profile.setId(generatedKeys.getInt(1));
+                }
             }
-
             return profile;
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.save() failed:");
-            e.printStackTrace();
-            return null;
+            throw new IllegalStateException("Failed to save profile.", e);
         }
     }
-
-    // findAll()
 
     @Override
     public List<Profile> findAll() {
         List<Profile> profiles = new ArrayList<>();
-
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_FIND_ALL);
-            ResultSet         rs   = stmt.executeQuery();
-
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_ALL);
+                ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
                 profiles.add(mapRow(rs));
             }
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.findAll() failed:");
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to load profiles.", e);
         }
-
-        return profiles; // empty list if something went wrong
+        return profiles;
     }
 
-    // findById()
-    
     @Override
     public Optional<Profile> findById(Integer id) {
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_ID);
-
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_ID)) {
             stmt.setInt(1, id);
-
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
             }
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.findById() failed:");
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to load profile by id.", e);
         }
-
         return Optional.empty();
     }
-
-    // findByName()
 
     public Optional<Profile> findByName(String name) {
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_NAME);
-
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_NAME)) {
             stmt.setString(1, name);
-
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return Optional.of(mapRow(rs));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
             }
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.findByName() failed:");
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to load profile by name.", e);
         }
-
         return Optional.empty();
     }
 
-    // update()
-    
     @Override
     public void update(Profile profile) {
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_UPDATE);
-
-            stmt.setString   (1, profile.getName());
-            stmt.setString   (2, profile.getDefaultCurrency().name());
-            stmt.setTimestamp(3, Timestamp.valueOf(profile.getCreatedAt()));
-            stmt.setInt      (4, profile.getId()); // WHERE id = ?
-
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_UPDATE)) {
+            stmt.setString(1, profile.getName());
+            stmt.setString(2, profile.getDefaultCurrency().name());
+            stmt.setInt(3, profile.getId());
             stmt.executeUpdate();
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.update() failed:");
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to update profile.", e);
         }
     }
 
-    // deleteById()
-   
     @Override
     public void deleteById(Integer id) {
-        try {
-            Connection        conn = DBConnection.getConnection();
-            PreparedStatement stmt = conn.prepareStatement(SQL_DELETE);
-
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_DELETE)) {
             stmt.setInt(1, id);
-
             stmt.executeUpdate();
-
         } catch (SQLException e) {
-            System.out.println("ProfileRepository.deleteById() failed:");
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to delete profile.", e);
         }
+    }
+
+    private Profile mapRow(ResultSet rs) throws SQLException {
+        Integer id = rs.getInt("id");
+        String name = rs.getString("name");
+        Currency defaultCurrency = Currency.valueOf(rs.getString("default_currency"));
+        LocalDateTime createdAt = rs.getTimestamp("created_at").toLocalDateTime();
+        return new Profile(id, name, defaultCurrency, createdAt);
     }
 }
