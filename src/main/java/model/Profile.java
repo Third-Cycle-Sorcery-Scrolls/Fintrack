@@ -1,22 +1,27 @@
 package model;
 
+import java.time.LocalDateTime;
+
 public class Profile {
     private int id;
     private String name;
-    private CurrencyType defaultCurrency;
+    private Currency defaultCurrency;
+    private LocalDateTime createdAt;
 
     public Profile() {
     }
 
-    public Profile(int id, String name, CurrencyType defaultCurrency) {
+    public Profile(int id, String name, Currency defaultCurrency, LocalDateTime createdAt) {
         this.id = id;
         this.name = name;
         this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
     }
 
-    public Profile(String name, CurrencyType defaultCurrency) {
+    public Profile(String name, Currency defaultCurrency, LocalDateTime createdAt) {
         this.name = name;
         this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
     }
 
     public int getId() {
@@ -35,11 +40,11 @@ public class Profile {
         this.name = name;
     }
 
-    public CurrencyType getDefaultCurrency() {
+    public Currency getDefaultCurrency() {
         return defaultCurrency;
     }
 
-    public void setDefaultCurrency(CurrencyType defaultCurrency) {
+    public void setDefaultCurrency(Currency defaultCurrency) {
         this.defaultCurrency = defaultCurrency;
     }
 
@@ -57,6 +62,7 @@ public class Profile {
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", defaultCurrency=" + defaultCurrency +
+                ", createdAt=" + createdAt +
                 '}';
     }
 }
