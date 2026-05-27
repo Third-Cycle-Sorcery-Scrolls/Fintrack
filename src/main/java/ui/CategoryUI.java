@@ -1,177 +1,241 @@
 package ui;
 
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 import model.Category;
 import service.CategoryService;
 
 import java.util.List;
-import java.util.Scanner;
 
-/**
- * Terminal UI for Category management.
- *
- * Rules:
- *   - ONLY calls CategoryService — never the repository directly
- *   - Handles all user input/output for category features
- *   - Needs a profileId (passed in from DashboardUI after login)
- *
- * Menu options:
- *   1. List categories
- *   2. Add category
- *   3. Rename category
- *   4. Delete category
- *   0. Back
- */
 public class CategoryUI {
 
     private final CategoryService categoryService;
-    private final Scanner scanner;
-
-    // ── Constructor ───────────────────────────────────────────────────────────
+    private TableView<Category> tableView;
+    private int currentProfileId;
 
     public CategoryUI() {
         this.categoryService = new CategoryService();
-        this.scanner         = new Scanner(System.in);
     }
 
-    // Allow injection (Integration teammate can pass these in from DashboardUI)
-    public CategoryUI(CategoryService categoryService, Scanner scanner) {
+    public CategoryUI(CategoryService categoryService) {
         this.categoryService = categoryService;
-        this.scanner         = scanner;
     }
 
-    // ── Main entry point ──────────────────────────────────────────────────────
+    public void show(Stage owner, int profileId) {
+        this.currentProfileId = profileId;
 
-    /**
-     * Launch the category menu for the given profile.
-     * Call this from DashboardUI passing in the logged-in profile's id.
-     *
-     * Example from DashboardUI:
-     *   CategoryUI categoryUI = new CategoryUI();
-     *   categoryUI.show(currentProfile.getId());
-     */
-    public void show(int profileId) {
-        boolean running = true;
+        Stage stage = new Stage();
+        stage.initModality(Modality.WINDOW_MODAL);
+        stage.initOwner(owner);
+        stage.setTitle("Category Management");
+        stage.setMinWidth(600);
+        stage.setMinHeight(500);
 
-        while (running) {
-            printMenu();
-            String input = scanner.nextLine().trim();
+        BorderPane root = new BorderPane();
+        root.setStyle("-fx-background-color: #f4f6f8;");
+        root.setTop(buildHeader());
+        root.setCenter(buildTableSection());
+        root.setBottom(buildButtonBar(stage));
 
-            switch (input) {
-                case "1" -> listCategories(profileId);
-                case "2" -> addCategory(profileId);
-                case "3" -> renameCategory(profileId);
-                case "4" -> deleteCategory(profileId);
-                case "0" -> {
-                    System.out.println("Returning to main menu...");
-                    running = false;
-                }
-                default  -> System.out.println("Invalid option. Please enter 0-4.");
-            }
+        Scene scene = new Scene(root, 620, 520);
+        stage.setScene(scene);
+        stage.show();
+        refreshTable();
+    }
+
+    private VBox buildHeader() {
+        Label title = new Label("Category Management");
+        title.setFont(Font.font("System", FontWeight.BOLD, 20));
+        title.setTextFill(Color.WHITE);
+
+        Label subtitle = new Label("Add, rename, or delete your spending categories");
+        subtitle.setFont(Font.font("System", 13));
+        subtitle.setTextFill(Color.web("#dce3ea"));
+
+        VBox header = new VBox(4, title, subtitle);
+        header.setPadding(new Insets(20, 24, 20, 24));
+        header.setStyle("-fx-background-color: #2c3e50;");
+        return header;
+    }
+
+    private VBox buildTableSection() {
+        TableColumn<Category, Integer> idCol = new TableColumn<>("ID");
+        idCol.setCellValueFactory(new PropertyValueFactory<>("id"));
+        idCol.setPrefWidth(60);
+        idCol.setStyle("-fx-alignment: CENTER;");
+
+        TableColumn<Category, String> nameCol = new TableColumn<>("Category Name");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.setPrefWidth(400);
+
+        tableView = new TableView<>();
+        tableView.getColumns().addAll(idCol, nameCol);
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tableView.setPlaceholder(new Label("No categories yet. Click 'Add' to create one."));
+        tableView.setStyle("-fx-background-color: white; -fx-border-color: #dde3ea; -fx-border-radius: 6;");
+
+        VBox section = new VBox(tableView);
+        section.setPadding(new Insets(16, 24, 8, 24));
+        VBox.setVgrow(tableView, Priority.ALWAYS);
+        return section;
+    }
+
+    private HBox buildButtonBar(Stage stage) {
+        Button addBtn    = styledButton("+ Add",    "#27ae60", "#219150");
+        Button renameBtn = styledButton("✎ Rename", "#2980b9", "#2471a3");
+        Button deleteBtn = styledButton("✕ Delete", "#e74c3c", "#c0392b");
+        Button closeBtn  = styledButton("Close",    "#7f8c8d", "#717d7e");
+
+        addBtn.setOnAction(e -> handleAdd());
+        renameBtn.setOnAction(e -> handleRename());
+        deleteBtn.setOnAction(e -> handleDelete());
+        closeBtn.setOnAction(e -> stage.close());
+
+        HBox bar = new HBox(10, addBtn, renameBtn, deleteBtn, closeBtn);
+        bar.setAlignment(Pos.CENTER_RIGHT);
+        bar.setPadding(new Insets(12, 24, 20, 24));
+        bar.setStyle("-fx-background-color: #f4f6f8; -fx-border-color: #dde3ea; -fx-border-width: 1 0 0 0;");
+        return bar;
+    }
+
+    private void handleAdd() {
+        String name = showInputDialog("Add Category", "Enter category name:", "");
+        if (name == null) return;
+
+        Category saved = categoryService.addCategory(currentProfileId, name);
+        if (saved != null) {
+            refreshTable();
+            showInfo("Category \"" + saved.getName() + "\" added successfully.");
+        } else {
+            showError("Could not add category.\nThe name may already exist or was left blank.");
         }
     }
 
-    // ── Menu ──────────────────────────────────────────────────────────────────
-
-    private void printMenu() {
-        System.out.println();
-        System.out.println("════════════════════════════");
-        System.out.println("       CATEGORY MENU        ");
-        System.out.println("════════════════════════════");
-        System.out.println("  1. List categories");
-        System.out.println("  2. Add category");
-        System.out.println("  3. Rename category");
-        System.out.println("  4. Delete category");
-        System.out.println("  0. Back");
-        System.out.println("════════════════════════════");
-        System.out.print("Choose an option: ");
-    }
-
-    // ── List ──────────────────────────────────────────────────────────────────
-
-    private void listCategories(int profileId) {
-        List<Category> categories = categoryService.getCategoriesForProfile(profileId);
-
-        System.out.println();
-        if (categories.isEmpty()) {
-            System.out.println("No categories found. Add one first!");
+    private void handleRename() {
+        Category selected = tableView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showError("Please select a category from the list first.");
             return;
         }
 
-        System.out.println("Your categories:");
-        System.out.println("──────────────────────────────");
-        for (Category c : categories) {
-            System.out.printf("  [%d] %s%n", c.getId(), c.getName());
+        String newName = showInputDialog(
+            "Rename Category",
+            "Enter new name for \"" + selected.getName() + "\":",
+            selected.getName()
+        );
+        if (newName == null) return;
+
+        Category updated = categoryService.renameCategory(selected.getId(), currentProfileId, newName);
+        if (updated != null) {
+            refreshTable();
+            showInfo("Category renamed to \"" + updated.getName() + "\" successfully.");
+        } else {
+            showError("Could not rename category.\nThe name may already exist or was left blank.");
         }
-        System.out.println("──────────────────────────────");
     }
 
-    // ── Add ───────────────────────────────────────────────────────────────────
-
-    private void addCategory(int profileId) {
-        System.out.println();
-        System.out.print("Enter category name: ");
-        String name = scanner.nextLine().trim();
-
-        // Hand off to service — it prints success/error messages
-        categoryService.addCategory(profileId, name);
-    }
-
-    // ── Rename ────────────────────────────────────────────────────────────────
-
-    private void renameCategory(int profileId) {
-        // Show the list first so the user knows which id to pick
-        listCategories(profileId);
-
-        List<Category> categories = categoryService.getCategoriesForProfile(profileId);
-        if (categories.isEmpty()) return; // nothing to rename
-
-        System.out.print("Enter the id of the category to rename: ");
-        int id = readInt();
-        if (id == -1) return; // user entered something invalid
-
-        System.out.print("Enter new name: ");
-        String newName = scanner.nextLine().trim();
-
-        categoryService.renameCategory(id, profileId, newName);
-    }
-
-    // ── Delete ────────────────────────────────────────────────────────────────
-
-    private void deleteCategory(int profileId) {
-        // Show the list first so the user knows which id to pick
-        listCategories(profileId);
-
-        List<Category> categories = categoryService.getCategoriesForProfile(profileId);
-        if (categories.isEmpty()) return; // nothing to delete
-
-        System.out.print("Enter the id of the category to delete: ");
-        int id = readInt();
-        if (id == -1) return;
-
-        // Confirm before deleting
-        System.out.print("Are you sure you want to delete this category? (yes/no): ");
-        String confirm = scanner.nextLine().trim().toLowerCase();
-        if (!confirm.equals("yes") && !confirm.equals("y")) {
-            System.out.println("Deletion cancelled.");
+    private void handleDelete() {
+        Category selected = tableView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showError("Please select a category from the list first.");
             return;
         }
 
-        categoryService.deleteCategory(id, profileId);
+        boolean confirmed = showConfirm(
+            "Delete Category",
+            "Are you sure you want to delete \"" + selected.getName() + "\"?\nThis cannot be undone."
+        );
+        if (!confirmed) return;
+
+        boolean deleted = categoryService.deleteCategory(selected.getId(), currentProfileId);
+        if (deleted) {
+            refreshTable();
+            showInfo("Category deleted successfully.");
+        } else {
+            showError("Could not delete category.\nIt may still be used by existing transactions.");
+        }
     }
 
-    // ── Utility ───────────────────────────────────────────────────────────────
+    private void refreshTable() {
+        List<Category> categories = categoryService.getCategoriesForProfile(currentProfileId);
+        tableView.getItems().setAll(categories);
+    }
 
-    /**
-     * Safely reads an integer from the user.
-     * Returns -1 if the input is not a valid number.
-     */
-    private int readInt() {
-        try {
-            String line = scanner.nextLine().trim();
-            return Integer.parseInt(line);
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Please enter a number.");
-            return -1;
-        }
+    private String showInputDialog(String title, String prompt, String defaultValue) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle(title);
+        dialog.setResizable(false);
+
+        Label promptLabel = new Label(prompt);
+        promptLabel.setFont(Font.font("System", 13));
+
+        TextField textField = new TextField(defaultValue);
+        textField.setPrefWidth(300);
+        textField.setStyle("-fx-font-size: 13; -fx-padding: 6 10 6 10;");
+
+        final String[] result = {null};
+
+        Button okBtn     = styledButton("OK",     "#2980b9", "#2471a3");
+        Button cancelBtn = styledButton("Cancel", "#7f8c8d", "#717d7e");
+
+        okBtn.setOnAction(e -> { result[0] = textField.getText().trim(); dialog.close(); });
+        cancelBtn.setOnAction(e -> dialog.close());
+        textField.setOnAction(e -> { result[0] = textField.getText().trim(); dialog.close(); });
+
+        HBox buttons = new HBox(10, okBtn, cancelBtn);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+
+        VBox layout = new VBox(14, promptLabel, textField, buttons);
+        layout.setPadding(new Insets(24));
+        layout.setStyle("-fx-background-color: #f4f6f8;");
+
+        dialog.setScene(new Scene(layout));
+        dialog.showAndWait();
+        return result[0];
+    }
+
+    private void showInfo(String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Success");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private boolean showConfirm(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        return alert.showAndWait().filter(r -> r == ButtonType.OK).isPresent();
+    }
+
+    private Button styledButton(String text, String color, String hoverColor) {
+        Button btn = new Button(text);
+        btn.setFont(Font.font("System", FontWeight.BOLD, 13));
+        btn.setTextFill(Color.WHITE);
+        btn.setPadding(new Insets(8, 18, 8, 18));
+        btn.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6; -fx-cursor: hand;");
+        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: " + hoverColor + "; -fx-background-radius: 6; -fx-cursor: hand;"));
+        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6; -fx-cursor: hand;"));
+        return btn;
     }
 }

@@ -1,4 +1,4 @@
-package service;
+apackage service;
 
 import model.Category;
 import repository.CategoryRepository;
@@ -7,31 +7,20 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Service for Category.
+ * Service for Category — all business logic and validation lives here.
  *
- * Rule: Service = logic.
- * All validation and business rules live here.
- * The UI calls the service. The service calls the repository.
- * The service never talks to the DB directly.
- *
- * Responsibilities (from the task sheet):
- *   ✔ add category
- *   ✔ delete category
- *   ✔ list categories
- *   ✔ unique category name validation per profile
+ * Error handling: throws IllegalArgumentException for validation failures,
+ * and lets RuntimeException from the repository bubble up to the UI.
+ * The UI catches everything and shows it in the TextArea.
  */
 public class CategoryService {
 
-    // The service OWNS its repository — UI never touches the repository directly
     private final CategoryRepository categoryRepository;
-
-    // ── Constructor ───────────────────────────────────────────────────────────
 
     public CategoryService() {
         this.categoryRepository = new CategoryRepository();
     }
 
-    // Allow injection (useful for testing or if Integration wires things up)
     public CategoryService(CategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
     }
@@ -39,85 +28,55 @@ public class CategoryService {
     // ── Add category ──────────────────────────────────────────────────────────
 
     /**
-     * Creates and saves a new category for the given profile.
-     *
-     * Validation rules:
-     *   1. Name must not be blank
-     *   2. Name must be unique within the profile (case-insensitive)
-     *
-     * Returns the saved Category on success, or null on failure.
-     * Prints a user-friendly message explaining why it failed.
+     * Creates and saves a new category.
+     * @throws IllegalArgumentException if name is blank or already exists
+     * @throws RuntimeException if database operation fails
      */
     public Category addCategory(int profileId, String name) {
-
-        // Rule 1: name must not be blank
         if (name == null || name.trim().isEmpty()) {
-            System.out.println("Error: Category name cannot be empty.");
-            return null;
+            throw new IllegalArgumentException("Category name cannot be empty.");
         }
 
         String trimmedName = name.trim();
 
-        // Rule 2: name must be unique per profile
         if (!isCategoryNameAvailable(profileId, trimmedName)) {
-            System.out.println("Error: A category named \"" + trimmedName +
-                               "\" already exists for this profile.");
-            return null;
+            throw new IllegalArgumentException(
+                "A category named \"" + trimmedName + "\" already exists for this profile."
+            );
         }
 
-        // All good — create the object and save it
         Category newCategory = new Category(profileId, trimmedName);
-        Category saved = categoryRepository.save(newCategory);
-
-        if (saved == null) {
-            System.out.println("Error: Could not save category. Please try again.");
-            return null;
-        }
-
-        System.out.println("Category \"" + saved.getName() + "\" added successfully (id=" + saved.getId() + ").");
-        return saved;
+        return categoryRepository.save(newCategory);
     }
 
     // ── Delete category ───────────────────────────────────────────────────────
 
     /**
-     * Deletes a category by its id.
-     *
-     * Validation rules:
-     *   1. Category must exist
-     *   2. Category must belong to the given profile (security: can't delete another profile's data)
-     *
-     * Returns true on success, false on failure.
+     * Deletes a category by id.
+     * @throws IllegalArgumentException if category not found or wrong profile
+     * @throws RuntimeException if database operation fails
      */
-    public boolean deleteCategory(int categoryId, int profileId) {
-
-        // Rule 1: does it exist?
+    public void deleteCategory(int categoryId, int profileId) {
         Optional<Category> result = categoryRepository.findById(categoryId);
+
         if (result.isEmpty()) {
-            System.out.println("Error: Category with id=" + categoryId + " not found.");
-            return false;
+            throw new IllegalArgumentException("Category with id=" + categoryId + " not found.");
         }
 
         Category existing = result.get();
 
-        // Rule 2: does it belong to this profile?
         if (existing.getProfileId() != profileId) {
-            System.out.println("Error: This category does not belong to your profile.");
-            return false;
+            throw new IllegalArgumentException("This category does not belong to your profile.");
         }
 
-        // deleteById returns void — we just call it and trust it worked
-        // If the DB blocks it (foreign key), the repository prints the error
         categoryRepository.deleteById(categoryId);
-        System.out.println("Category \"" + existing.getName() + "\" deleted successfully.");
-        return true;
     }
 
     // ── List categories ───────────────────────────────────────────────────────
 
     /**
      * Returns all categories for the given profile.
-     * Returns an empty list (never null) if there are none.
+     * @throws RuntimeException if database operation fails
      */
     public List<Category> getCategoriesForProfile(int profileId) {
         return categoryRepository.findAllByProfileId(profileId);
@@ -127,74 +86,53 @@ public class CategoryService {
 
     /**
      * Fetches a single category by id.
-     * Returns null if not found.
-     * Used by other services (e.g. TransactionService) to validate a categoryId.
+     * @throws RuntimeException if database operation fails
      */
     public Category getCategoryById(int categoryId) {
-        // findById returns Optional — unwrap it, return null if not found
         return categoryRepository.findById(categoryId).orElse(null);
     }
 
-    // ── Update / rename category ──────────────────────────────────────────────
+    // ── Rename category ───────────────────────────────────────────────────────
 
     /**
      * Renames an existing category.
-     *
-     * Steps (follow project rule: findById first, then modify, then update):
-     *   1. Find the category
-     *   2. Validate ownership
-     *   3. Check new name is unique
-     *   4. Modify and save
-     *
-     * Returns the updated Category on success, null on failure.
+     * @throws IllegalArgumentException if name blank, category not found, wrong profile, or name taken
+     * @throws RuntimeException if database operation fails
      */
     public Category renameCategory(int categoryId, int profileId, String newName) {
-
         if (newName == null || newName.trim().isEmpty()) {
-            System.out.println("Error: New category name cannot be empty.");
-            return null;
+            throw new IllegalArgumentException("New category name cannot be empty.");
         }
 
         String trimmedName = newName.trim();
 
-        // Step 1 — findById returns Optional, unwrap it
+        // findById first — required by project rules before calling update
         Optional<Category> result = categoryRepository.findById(categoryId);
         if (result.isEmpty()) {
-            System.out.println("Error: Category with id=" + categoryId + " not found.");
-            return null;
+            throw new IllegalArgumentException("Category with id=" + categoryId + " not found.");
         }
 
         Category existing = result.get();
 
-        // Step 2 — ownership check
         if (existing.getProfileId() != profileId) {
-            System.out.println("Error: This category does not belong to your profile.");
-            return null;
+            throw new IllegalArgumentException("This category does not belong to your profile.");
         }
 
-        // Step 3 — unique name check (skip if name hasn't actually changed)
         if (!existing.getName().equalsIgnoreCase(trimmedName) &&
             !isCategoryNameAvailable(profileId, trimmedName)) {
-            System.out.println("Error: A category named \"" + trimmedName +
-                               "\" already exists for this profile.");
-            return null;
+            throw new IllegalArgumentException(
+                "A category named \"" + trimmedName + "\" already exists for this profile."
+            );
         }
 
-        // Step 4 — modify then update (update returns void now)
         existing.setName(trimmedName);
         categoryRepository.update(existing);
-        System.out.println("Category renamed to \"" + trimmedName + "\" successfully.");
         return existing;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    /**
-     * Returns true if the name is NOT already taken for this profile.
-     * (True = the name is available to use.)
-     */
     private boolean isCategoryNameAvailable(int profileId, String name) {
-        // findByNameAndProfileId returns Category directly (it's our own extra method, not from interface)
         Category found = categoryRepository.findByNameAndProfileId(name, profileId);
         return found == null;
     }
