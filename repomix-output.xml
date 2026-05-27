@@ -1,0 +1,1518 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+db.sql
+pom.xml
+README.md
+src/main/java/config/DBConnection.java
+src/main/java/Main.java
+src/main/java/model/Category.java
+src/main/java/model/Currency.java
+src/main/java/model/FrequencyType.java
+src/main/java/model/Profile.java
+src/main/java/model/RecurringExpense.java
+src/main/java/model/Tag.java
+src/main/java/model/Transaction.java
+src/main/java/model/TransactionTag.java
+src/main/java/model/TransactionType.java
+src/main/java/remote/CalculatorClient.java
+src/main/java/remote/CalculatorServer.java
+src/main/java/remote/CalculatorService.java
+src/main/java/remote/RemoteCalculator.java
+src/main/java/repository/ProfileRepository.java
+src/main/java/repository/Repository.java
+src/main/java/service/AnalyticsService.java
+src/main/java/service/ProfileService.java
+src/main/java/ui/DashboardUI.java
+src/main/java/ui/ProfileSetupUI.java
+src/main/resources/app-icon.png
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+.vscode/
+bin/
+target/
+</file>
+
+<file path="db.sql">
+CREATE TYPE currency_type AS ENUM ('ETB', 'USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'CNY', 'INR', 'BRL'); -- extend as needed
+CREATE TYPE transaction_type AS ENUM ('INCOME', 'EXPENSE');
+CREATE TYPE frequency_type AS ENUM ('WEEKLY', 'MONTHLY', 'YEARLY');
+
+CREATE TABLE profiles (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    default_currency currency_type NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+CREATE TABLE categories (
+    id         SERIAL PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    CONSTRAINT unique_profile_category UNIQUE (profile_id, name)
+);
+
+
+CREATE TABLE tags (
+    id         SERIAL PRIMARY KEY,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    CONSTRAINT unique_profile_tag UNIQUE (profile_id, name)
+);
+
+
+CREATE TABLE transactions (
+    id          SERIAL PRIMARY KEY,
+    profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    date        DATE NOT NULL,
+    amount      NUMERIC(15,2) NOT NULL CHECK (amount > 0),
+    type        transaction_type NOT NULL,
+    currency    currency_type NOT NULL,
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    description TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+CREATE TABLE transaction_tags (
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    tag_id         INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (transaction_id, tag_id)
+);
+
+
+CREATE TABLE recurring_expenses (
+    id          SERIAL PRIMARY KEY,
+    profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    amount      NUMERIC(15,2) NOT NULL CHECK (amount > 0),
+    currency    currency_type NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    description TEXT,
+    frequency   frequency_type NOT NULL,
+    start_date  DATE NOT NULL,
+    end_date    DATE,    -- NULL means indefinite
+    is_active   BOOLEAN NOT NULL DEFAULT true,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (end_date IS NULL OR end_date >= start_date)
+);
+</file>
+
+<file path="src/main/java/config/DBConnection.java">
+package config;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DBConnection {
+    private static final String URL = "jdbc:postgresql://localhost:5432/finance_tracker";
+    private static final String USER = "postgres";
+    private static final String PASSWORD = "password";
+
+    private static Connection connection = null;
+
+    public static Connection getConnection() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            connection = DriverManager.getConnection(URL, USER, PASSWORD);
+            System.out.println("Database connected.");
+        }
+        return connection;
+    }
+
+    public static void closeConnection() throws SQLException {
+        if (connection != null && !connection.isClosed()) {
+            connection.close();
+            connection = null;
+            System.out.println("Database connection closed.");
+        }
+    }
+}
+</file>
+
+<file path="src/main/java/Main.java">
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.image.Image;
+import javafx.stage.Stage;
+
+import java.io.InputStream;
+import service.AnalyticsService;
+import ui.DashboardUI;
+
+public class Main extends Application {
+    @Override
+    public void start(Stage primaryStage) {
+        DashboardUI dashboardUI = new DashboardUI(new AnalyticsService());
+        Scene scene = new Scene(dashboardUI.buildView(), 900, 600);
+
+        InputStream iconStream = getClass().getResourceAsStream("/app-icon.png");
+        if (iconStream != null) {
+            primaryStage.getIcons().add(new Image(iconStream));
+        }
+
+        primaryStage.setTitle("Fintrack");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+</file>
+
+<file path="src/main/java/model/FrequencyType.java">
+package model;
+
+public enum FrequencyType {
+    WEEKLY,
+    MONTHLY,
+    YEARLY
+}
+</file>
+
+<file path="src/main/java/model/TransactionTag.java">
+package model;
+
+public class TransactionTag {
+    private int transactionId;
+    private int tagId;
+
+    public TransactionTag() {
+    }
+
+    public TransactionTag(int transactionId, int tagId) {
+        this.transactionId = transactionId;
+        this.tagId = tagId;
+    }
+
+    public int getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(int transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public int getTagId() {
+        return tagId;
+    }
+
+    public void setTagId(int tagId) {
+        this.tagId = tagId;
+    }
+
+    @Override
+    public String toString() {
+        return "TransactionTag{" +
+                "transactionId=" + transactionId +
+                ", tagId=" + tagId +
+                '}';
+    }
+}
+</file>
+
+<file path="src/main/java/model/TransactionType.java">
+package model;
+
+public enum TransactionType {
+    INCOME,
+    EXPENSE
+}
+</file>
+
+<file path="src/main/java/remote/CalculatorClient.java">
+package remote;
+
+import java.rmi.Naming;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class CalculatorClient {
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "calculator-rmi-client");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    public CompletableFuture<Double> calculateBalanceAsync(double income, double expense) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                RemoteCalculator calculator = (RemoteCalculator) Naming.lookup(CalculatorServer.SERVICE_URL);
+                return calculator.calculateBalance(income, expense);
+            } catch (Exception e) {
+                throw new IllegalStateException("Remote calculator is unavailable.", e);
+            }
+        }, executorService);
+    }
+
+    public void shutdown() {
+        executorService.shutdownNow();
+    }
+}
+</file>
+
+<file path="src/main/java/remote/RemoteCalculator.java">
+package remote;
+
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+
+public interface RemoteCalculator extends Remote {
+    double add(double a, double b) throws RemoteException;
+
+    double subtract(double a, double b) throws RemoteException;
+
+    double calculateBalance(double income, double expense) throws RemoteException;
+}
+</file>
+
+<file path="src/main/java/repository/Repository.java">
+package repository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface Repository<T, ID> {
+    T save(T entity);               // insert a new entity, return it with generated ID
+    List<T> findAll();              // get all entities
+    Optional<T> findById(ID id);    // find one by ID (maybe not exist)
+    void update(T entity);          // update existing entity
+    void deleteById(ID id);         // delete by ID
+}
+</file>
+
+<file path="src/main/java/service/AnalyticsService.java">
+package service;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Lightweight dashboard analytics aggregator.
+ *
+ * This class is intentionally DB-agnostic for now so teammates can merge
+ * their modules first; replace mock values with repository queries during
+ * integration.
+ */
+public class AnalyticsService {
+
+    public Map<String, String> buildSummary() {
+        Map<String, String> summary = new LinkedHashMap<>();
+        summary.put("Total Transactions", "0");
+        summary.put("Total Categories", "0");
+        summary.put("Recurring Expenses", "0");
+        summary.put("Net Balance", "$0.00");
+        return summary;
+    }
+}
+</file>
+
+<file path="src/main/java/ui/DashboardUI.java">
+package ui;
+
+import config.DBConnection;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import service.AnalyticsService;
+
+import java.io.InputStream;
+import java.sql.SQLException;
+import java.util.Map;
+
+public class DashboardUI {
+    private final AnalyticsService analyticsService;
+
+    public DashboardUI(AnalyticsService analyticsService) {
+        this.analyticsService = analyticsService;
+    }
+
+    public BorderPane buildView() {
+        BorderPane root = new BorderPane();
+        root.setStyle("-fx-background-color: #ecf0f1;");
+        root.setLeft(buildSidebar());
+        root.setCenter(buildMainContent());
+        return root;
+    }
+
+    private VBox buildSidebar() {
+        Button profileBtn = menuButton("Profile Setup");
+        Button categoryBtn = menuButton("Manage Categories");
+        Button transactionBtn = menuButton("Transactions");
+        Button tagBtn = menuButton("Manage Tags");
+        Button recurringBtn = menuButton("Recurring Expenses");
+
+        profileBtn.setOnAction(e -> System.out.println("Open Profile UI"));
+        categoryBtn.setOnAction(e -> System.out.println("Open Category UI"));
+        transactionBtn.setOnAction(e -> System.out.println("Open Transaction UI"));
+        tagBtn.setOnAction(e -> System.out.println("Open Tag UI"));
+        recurringBtn.setOnAction(e -> System.out.println("Open Recurring UI"));
+
+        VBox sideMenu = new VBox(10,
+                buildSidebarIcon(),
+                profileBtn,
+                categoryBtn,
+                transactionBtn,
+                tagBtn,
+                recurringBtn
+        );
+        sideMenu.setPadding(new Insets(10));
+        sideMenu.setStyle("-fx-background-color: #34495e; -fx-pref-width: 210;");
+        sideMenu.setFillWidth(true);
+        return sideMenu;
+    }
+
+    private VBox buildMainContent() {
+        Label title = new Label("Fintrack Dashboard");
+        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        Label dbStatus = new Label(getDatabaseStatus());
+
+        GridPane summaryGrid = new GridPane();
+        summaryGrid.setHgap(20);
+        summaryGrid.setVgap(10);
+
+        int row = 0;
+        for (Map.Entry<String, String> entry : analyticsService.buildSummary().entrySet()) {
+            Label key = new Label(entry.getKey() + ":");
+            key.setStyle("-fx-font-weight: bold;");
+            Label value = new Label(entry.getValue());
+            summaryGrid.addRow(row++, key, value);
+        }
+
+        Label ownerNote = new Label("Feature-specific UIs are implemented by teammates. Dashboard provides integration/navigation only.");
+        ownerNote.setWrapText(true);
+
+        HBox moduleSlots = new HBox(10,
+                moduleTag("Profile UI"),
+                moduleTag("Category UI"),
+                moduleTag("Transaction UI"),
+                moduleTag("Tag UI"),
+                moduleTag("Recurring UI")
+        );
+
+        VBox mainContent = new VBox(14, title, dbStatus, summaryGrid, ownerNote, moduleSlots);
+        mainContent.setPadding(new Insets(20));
+        mainContent.setAlignment(Pos.TOP_LEFT);
+        return mainContent;
+    }
+
+    private HBox buildSidebarIcon() {
+        InputStream iconStream = getClass().getResourceAsStream("/app-icon.png");
+        if (iconStream == null) {
+            Label fallbackIcon = new Label("📊");
+            fallbackIcon.setStyle("-fx-font-size: 48px;");
+            HBox box = new HBox(fallbackIcon);
+            box.setAlignment(Pos.CENTER);
+            box.setPadding(new Insets(6, 0, 10, 0));
+            return box;
+        }
+
+        ImageView logoView = new ImageView(new Image(iconStream));
+        logoView.setFitWidth(64);
+        logoView.setFitHeight(64);
+        logoView.setPreserveRatio(true);
+
+        HBox box = new HBox(logoView);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(6, 0, 10, 0));
+        return box;
+    }
+
+    private Button menuButton(String text) {
+        Button button = new Button(text);
+        button.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(button, Priority.NEVER);
+        return button;
+    }
+
+    private Label moduleTag(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-padding: 6 10; -fx-background-color: #e8edf5; -fx-background-radius: 8;");
+        return label;
+    }
+
+    private String getDatabaseStatus() {
+        try {
+            DBConnection.getConnection();
+            return "Database: Connected";
+        } catch (SQLException e) {
+            return "Database: Not connected (" + e.getMessage() + ")";
+        }
+    }
+}
+</file>
+
+<file path="pom.xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com</groupId>
+    <artifactId>fintrack</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>25.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.6.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+</file>
+
+<file path="README.md">
+# Fintrack
+
+
+Fintrack is a JavaFX desktop app for personal finance tracking.
+
+## Prerequisites
+- Java **21+** (LTS recommended)
+- Maven **3.9+**
+- PostgreSQL running locally (default expected DB: `finance_tracker`)
+
+## Database setup
+1. Create database:
+   ```sql
+   CREATE DATABASE finance_tracker;
+   ```
+2. Update credentials in `src/main/java/config/DBConnection.java` if needed.
+
+Default values currently used:
+- URL: `jdbc:postgresql://localhost:5432/finance_tracker`
+- USER: `postgres`
+- PASSWORD: `password`
+
+## Run with Maven
+```bash
+mvn clean javafx:run
+```
+
+## Compile only
+```bash
+mvn clean compile
+```
+
+## Common issues
+### 1) Maven dependency download fails with `403 Forbidden`
+If Maven cannot fetch plugins/dependencies from Maven Central:
+- Check internet/proxy/firewall settings.
+- Confirm Maven Central is reachable from your machine:
+  - https://repo.maven.apache.org/maven2/
+- Retry after clearing failed cache:
+  ```bash
+  rm -rf ~/.m2/repository/org/apache/maven/plugins/maven-resources-plugin
+  mvn -U clean compile
+  ```
+
+### 2) DB connection shows "Not connected"
+- Ensure PostgreSQL is running.
+- Ensure database/user/password match `DBConnection` values.
+
+## Current module structure
+- `main/Main.java` → JavaFX app entrypoint
+- `ui/DashboardUI.java` → Dashboard shell and integration surface
+- `service/AnalyticsService.java` → Dashboard summary provider (stub until module integration)
+- `config/DBConnection.java` → DB connection utility
+</file>
+
+<file path="src/main/java/model/Category.java">
+package model;
+
+public class Category {
+    private int id;
+    private int profileId;
+    private String name;
+
+    public Category() {
+    }
+
+    public Category(int id, int profileId, String name) {
+        this.id = id;
+        this.profileId = profileId;
+        this.name = name;
+    }
+
+    public Category(int profileId, String name) {
+        this.profileId = profileId;
+        this.name = name;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(int profileId) {
+        this.profileId = profileId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+}
+</file>
+
+<file path="src/main/java/model/Currency.java">
+package model;
+
+public enum Currency {
+    ETB("Ethiopian Birr", "Br"),
+    USD("US Dollar", "$"),
+    EUR("Euro", "EUR"),
+    GBP("British Pound", "GBP"),
+    JPY("Japanese Yen", "JPY"),
+    CHF("Swiss Franc", "CHF"),
+    CAD("Canadian Dollar", "CAD"),
+    AUD("Australian Dollar", "AUD"),
+    CNY("Chinese Yuan", "CNY"),
+    INR("Indian Rupee", "INR"),
+    BRL("Brazilian Real", "BRL");
+
+    private final String fullName;
+    private final String symbol;
+
+    Currency(String fullName, String symbol) {
+        this.fullName = fullName;
+        this.symbol = symbol;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public String getSymbol() {
+        return symbol;
+    }
+
+    @Override
+    public String toString() {
+        return name() + " - " + fullName + " (" + symbol + ")";
+    }
+}
+</file>
+
+<file path="src/main/java/model/RecurringExpense.java">
+package model;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public class RecurringExpense {
+    private int id;
+    private int profileId;
+    private int categoryId;
+    private BigDecimal amount;
+    private Currency currency;
+    private String description;
+    private FrequencyType frequency;
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private boolean active;
+
+    public RecurringExpense() {
+    }
+
+    public RecurringExpense(int id, int profileId, int categoryId, BigDecimal amount, Currency currency, String description, FrequencyType frequency, LocalDate startDate, LocalDate endDate, boolean active) {
+        this.id = id;
+        this.profileId = profileId;
+        this.categoryId = categoryId;
+        this.amount = amount;
+        this.currency = currency;
+        this.description = description;
+        this.frequency = frequency;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.active = active;
+    }
+
+    public RecurringExpense(int profileId, int categoryId, BigDecimal amount, Currency currency, String description, FrequencyType frequency, LocalDate startDate, LocalDate endDate, boolean active) {
+        this.profileId = profileId;
+        this.categoryId = categoryId;
+        this.amount = amount;
+        this.currency = currency;
+        this.description = description;
+        this.frequency = frequency;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.active = active;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(int profileId) {
+        this.profileId = profileId;
+    }
+
+    public int getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(int categoryId) {
+        this.categoryId = categoryId;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
+    public Currency getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(Currency currency) {
+        this.currency = currency;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public FrequencyType getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(FrequencyType frequency) {
+        this.frequency = frequency;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    @Override
+    public String toString() {
+        return frequency + " - " + amount + " " + currency + " from " + startDate + " - " + description;
+    }
+}
+</file>
+
+<file path="src/main/java/model/Tag.java">
+package model;
+
+public class Tag {
+    private int id;
+    private int profileId;
+    private String name;
+
+    public Tag() {
+    }
+
+    public Tag(int id, int profileId, String name) {
+        this.id = id;
+        this.profileId = profileId;
+        this.name = name;
+    }
+
+    public Tag(int profileId, String name) {
+        this.profileId = profileId;
+        this.name = name;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(int profileId) {
+        this.profileId = profileId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+}
+</file>
+
+<file path="src/main/java/model/Transaction.java">
+package model;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public class Transaction {
+    private int id;
+    private int profileId;
+    private int categoryId;
+    private BigDecimal amount;
+    private TransactionType type;
+    private Currency currency;
+    private String description;
+    private LocalDate transactionDate;
+
+    public Transaction() {
+    }
+
+    public Transaction(int id, int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
+        this.id = id;
+        this.profileId = profileId;
+        this.categoryId = categoryId;
+        this.amount = amount;
+        this.type = type;
+        this.currency = currency;
+        this.description = description;
+        this.transactionDate = transactionDate;
+    }
+
+    public Transaction(int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
+        this.profileId = profileId;
+        this.categoryId = categoryId;
+        this.amount = amount;
+        this.type = type;
+        this.currency = currency;
+        this.description = description;
+        this.transactionDate = transactionDate;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(int profileId) {
+        this.profileId = profileId;
+    }
+
+    public int getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(int categoryId) {
+        this.categoryId = categoryId;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
+    public TransactionType getType() {
+        return type;
+    }
+
+    public void setType(TransactionType type) {
+        this.type = type;
+    }
+
+    public Currency getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(Currency currency) {
+        this.currency = currency;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public LocalDate getTransactionDate() {
+        return transactionDate;
+    }
+
+    public void setTransactionDate(LocalDate transactionDate) {
+        this.transactionDate = transactionDate;
+    }
+
+    @Override
+    public String toString() {
+        return transactionDate + " - " + type + " " + amount + " " + currency + " - " + description;
+    }
+}
+</file>
+
+<file path="src/main/java/remote/CalculatorServer.java">
+package remote;
+
+import java.rmi.AlreadyBoundException;
+import java.rmi.Naming;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+
+public class CalculatorServer {
+    public static final String SERVICE_URL = "rmi://localhost:1099/CalculatorService";
+    private static boolean started;
+
+    public static synchronized void startServer() throws Exception {
+        if (started) {
+            return;
+        }
+        try {
+            LocateRegistry.createRegistry(1099);
+        } catch (RemoteException ignored) {
+            // Registry is already running on this machine.
+        }
+
+        CalculatorService service = new CalculatorService();
+        try {
+            Naming.bind(SERVICE_URL, service);
+        } catch (AlreadyBoundException ex) {
+            Naming.rebind(SERVICE_URL, service);
+        }
+        started = true;
+        System.out.println("Calculator RMI server is running at " + SERVICE_URL);
+    }
+
+    public static void startServerInBackground() {
+        Thread serverThread = new Thread(() -> {
+            try {
+                startServer();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, "calculator-rmi-server");
+        serverThread.setDaemon(true);
+        serverThread.start();
+    }
+
+    public static void main(String[] args) {
+        try {
+            startServer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</file>
+
+<file path="src/main/java/remote/CalculatorService.java">
+package remote;
+
+import java.rmi.RemoteException;
+import java.rmi.server.UnicastRemoteObject;
+
+public class CalculatorService extends UnicastRemoteObject implements RemoteCalculator {
+    public CalculatorService() throws RemoteException {
+        super();
+    }
+
+    @Override
+    public double add(double a, double b) throws RemoteException {
+        return a + b;
+    }
+
+    @Override
+    public double subtract(double a, double b) throws RemoteException {
+        return a - b;
+    }
+
+    @Override
+    public double calculateBalance(double income, double expense) throws RemoteException {
+        return subtract(income, expense);
+    }
+}
+</file>
+
+<file path="src/main/java/service/ProfileService.java">
+package service;
+
+import model.Currency;
+import model.Profile;
+import repository.ProfileRepository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+public class ProfileService {
+    private static final int MIN_NAME_LENGTH = 2;
+    private static final int MAX_NAME_LENGTH = 50;
+
+    private final ProfileRepository profileRepository;
+    private Profile activeProfile;
+
+    public ProfileService(ProfileRepository profileRepository) {
+        this.profileRepository = profileRepository;
+    }
+
+    public Profile save(Profile profile) {
+        Profile savedProfile = createProfile(profile.getName(), profile.getDefaultCurrency());
+        if (savedProfile == null) {
+            throw new IllegalArgumentException("Profile could not be saved.");
+        }
+        return savedProfile;
+    }
+
+    public Profile createProfile(String name, Currency defaultCurrency) {
+        String trimmedName = validateName(name);
+        if (defaultCurrency == null) {
+            throw new IllegalArgumentException("Default currency must be selected.");
+        }
+        if (profileExists(trimmedName)) {
+            throw new IllegalArgumentException("A profile with this name already exists.");
+        }
+
+        Profile savedProfile = profileRepository.save(new Profile(trimmedName, defaultCurrency, LocalDateTime.now()));
+        activeProfile = savedProfile;
+        return savedProfile;
+    }
+
+    public List<Profile> findAll() {
+        return profileRepository.findAll();
+    }
+
+    public List<Profile> getAllProfiles() {
+        return findAll();
+    }
+
+    public Optional<Profile> findById(Integer id) {
+        return profileRepository.findById(id);
+    }
+
+    public Profile getProfileById(Integer id) {
+        return findById(id).orElse(null);
+    }
+
+    public Optional<Profile> getActiveProfile() {
+        return Optional.ofNullable(activeProfile);
+    }
+
+    public Profile requireActiveProfile() {
+        return getActiveProfile()
+                .orElseThrow(() -> new IllegalStateException("Create or select a profile before continuing."));
+    }
+
+    public void setActiveProfile(Profile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("Profile is required.");
+        }
+        activeProfile = profile;
+    }
+
+    public void update(Profile profile) {
+        updateProfile(profile.getId(), profile.getName(), profile.getDefaultCurrency());
+    }
+
+    public boolean updateProfile(Integer id, String newName, Currency newCurrency) {
+        if (id == null) {
+            throw new IllegalArgumentException("Profile id cannot be null.");
+        }
+
+        Profile existingProfile = profileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No profile found with id: " + id));
+
+        if (newName != null) {
+            String trimmedName = validateName(newName);
+            if (!trimmedName.equalsIgnoreCase(existingProfile.getName()) && profileExists(trimmedName)) {
+                throw new IllegalArgumentException("A profile with this name already exists.");
+            }
+            existingProfile.setName(trimmedName);
+        }
+        if (newCurrency != null) {
+            existingProfile.setDefaultCurrency(newCurrency);
+        }
+
+        profileRepository.update(existingProfile);
+        activeProfile = existingProfile;
+        return true;
+    }
+
+    public void deleteById(Integer id) {
+        deleteProfile(id);
+    }
+
+    public boolean deleteProfile(Integer id) {
+        if (id == null) {
+            throw new IllegalArgumentException("Profile id cannot be null.");
+        }
+        profileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No profile found with id: " + id));
+        profileRepository.deleteById(id);
+        if (activeProfile != null && id.equals(activeProfile.getId())) {
+            activeProfile = null;
+        }
+        return true;
+    }
+
+    private String validateName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Profile name cannot be empty.");
+        }
+        String trimmedName = name.trim();
+        if (trimmedName.length() < MIN_NAME_LENGTH) {
+            throw new IllegalArgumentException("Profile name must be at least " + MIN_NAME_LENGTH + " characters.");
+        }
+        if (trimmedName.length() > MAX_NAME_LENGTH) {
+            throw new IllegalArgumentException("Profile name must be at most " + MAX_NAME_LENGTH + " characters.");
+        }
+        return trimmedName;
+    }
+
+    private boolean profileExists(String name) {
+        return profileRepository.findByName(name).isPresent();
+    }
+}
+</file>
+
+<file path="src/main/java/model/Profile.java">
+package model;
+
+import java.time.LocalDateTime;
+
+public class Profile {
+    private Integer id;
+    private String name;
+    private Currency defaultCurrency;
+    private LocalDateTime createdAt;
+
+    public Profile() {
+    }
+
+    public Profile(String name, Currency defaultCurrency) {
+        this(name, defaultCurrency, LocalDateTime.now());
+    }
+
+    public Profile(String name, Currency defaultCurrency, LocalDateTime createdAt) {
+        this.name = name;
+        this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
+    }
+
+    public Profile(Integer id, String name, Currency defaultCurrency, LocalDateTime createdAt) {
+        this.id = id;
+        this.name = name;
+        this.defaultCurrency = defaultCurrency;
+        this.createdAt = createdAt;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Currency getDefaultCurrency() {
+        return defaultCurrency;
+    }
+
+    public void setDefaultCurrency(Currency defaultCurrency) {
+        this.defaultCurrency = defaultCurrency;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    @Override
+    public String toString() {
+        return name + " (" + defaultCurrency + ")";
+    }
+}
+</file>
+
+<file path="src/main/java/repository/ProfileRepository.java">
+package repository;
+
+import config.DBConnection;
+import model.Currency;
+import model.Profile;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+public class ProfileRepository implements Repository<Profile, Integer> {
+    private static final String SQL_INSERT = "INSERT INTO profiles (name, default_currency, created_at) VALUES (?, ?, ?)";
+    private static final String SQL_FIND_ALL = "SELECT id, name, default_currency, created_at FROM profiles ORDER BY name";
+    private static final String SQL_FIND_BY_ID = "SELECT id, name, default_currency, created_at FROM profiles WHERE id = ?";
+    private static final String SQL_FIND_BY_NAME = "SELECT id, name, default_currency, created_at FROM profiles WHERE LOWER(name) = LOWER(?)";
+    private static final String SQL_UPDATE = "UPDATE profiles SET name = ?, default_currency = ? WHERE id = ?";
+    private static final String SQL_DELETE = "DELETE FROM profiles WHERE id = ?";
+
+    @Override
+    public Profile save(Profile profile) {
+        if (profile.getCreatedAt() == null) {
+            profile.setCreatedAt(LocalDateTime.now());
+        }
+
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, profile.getName());
+            stmt.setString(2, profile.getDefaultCurrency().name());
+            stmt.setTimestamp(3, Timestamp.valueOf(profile.getCreatedAt()));
+            stmt.executeUpdate();
+
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    profile.setId(generatedKeys.getInt(1));
+                }
+            }
+            return profile;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to save profile.", e);
+        }
+    }
+
+    @Override
+    public List<Profile> findAll() {
+        List<Profile> profiles = new ArrayList<>();
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_ALL);
+                ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                profiles.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load profiles.", e);
+        }
+        return profiles;
+    }
+
+    @Override
+    public Optional<Profile> findById(Integer id) {
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_ID)) {
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load profile by id.", e);
+        }
+        return Optional.empty();
+    }
+
+    public Optional<Profile> findByName(String name) {
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_FIND_BY_NAME)) {
+            stmt.setString(1, name);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load profile by name.", e);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public void update(Profile profile) {
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_UPDATE)) {
+            stmt.setString(1, profile.getName());
+            stmt.setString(2, profile.getDefaultCurrency().name());
+            stmt.setInt(3, profile.getId());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to update profile.", e);
+        }
+    }
+
+    @Override
+    public void deleteById(Integer id) {
+        try (Connection conn = DBConnection.getConnection();
+                PreparedStatement stmt = conn.prepareStatement(SQL_DELETE)) {
+            stmt.setInt(1, id);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to delete profile.", e);
+        }
+    }
+
+    private Profile mapRow(ResultSet rs) throws SQLException {
+        Integer id = rs.getInt("id");
+        String name = rs.getString("name");
+        Currency defaultCurrency = Currency.valueOf(rs.getString("default_currency"));
+        LocalDateTime createdAt = rs.getTimestamp("created_at").toLocalDateTime();
+        return new Profile(id, name, defaultCurrency, createdAt);
+    }
+}
+</file>
+
+<file path="src/main/java/ui/ProfileSetupUI.java">
+package ui;
+
+import javafx.geometry.Insets;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
+import model.Currency;
+import model.Profile;
+import service.ProfileService;
+
+public class ProfileSetupUI {
+    private final ProfileService profileService;
+    private final Runnable profileChangedCallback;
+    private final TextArea outputArea = new TextArea();
+
+    public ProfileSetupUI(ProfileService profileService) {
+        this(profileService, () -> { });
+    }
+
+    public ProfileSetupUI(ProfileService profileService, Runnable profileChangedCallback) {
+        this.profileService = profileService;
+        this.profileChangedCallback = profileChangedCallback;
+    }
+
+    public VBox buildView() {
+        ComboBox<Profile> profileBox = new ComboBox<>();
+        profileBox.setMaxWidth(Double.MAX_VALUE);
+        refreshProfileList(profileBox);
+
+        Button useProfileButton = new Button("Use Selected Profile");
+        useProfileButton.setOnAction(event -> {
+            Profile selectedProfile = profileBox.getValue();
+            if (selectedProfile == null) {
+                outputArea.setText("Select a profile or create a new one.");
+                return;
+            }
+            profileService.setActiveProfile(selectedProfile);
+            refreshOutput(profileBox);
+            profileChangedCallback.run();
+        });
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Profile name");
+
+        ComboBox<Currency> currencyBox = new ComboBox<>();
+        currencyBox.getItems().setAll(Currency.values());
+        currencyBox.setValue(Currency.ETB);
+        currencyBox.setMaxWidth(Double.MAX_VALUE);
+
+        Button saveButton = new Button("Create Profile");
+        saveButton.setOnAction(event -> {
+            try {
+                Profile savedProfile = profileService.createProfile(nameField.getText(), currencyBox.getValue());
+                nameField.clear();
+                refreshProfileList(profileBox);
+                profileBox.setValue(savedProfile);
+                refreshOutput(profileBox);
+                profileChangedCallback.run();
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                outputArea.setText(ex.getMessage());
+            }
+        });
+
+        outputArea.setEditable(false);
+        refreshOutput(profileBox);
+
+        VBox root = new VBox(10,
+                new Label("Existing profiles"),
+                profileBox,
+                useProfileButton,
+                new Label("New profile"),
+                nameField,
+                new Label("Default currency"),
+                currencyBox,
+                saveButton,
+                outputArea);
+        root.setPadding(new Insets(16));
+        return root;
+    }
+
+    private void refreshProfileList(ComboBox<Profile> profileBox) {
+        try {
+            profileBox.getItems().setAll(profileService.findAll());
+            profileService.getActiveProfile().ifPresent(profileBox::setValue);
+        } catch (IllegalStateException ex) {
+            outputArea.setText(ex.getMessage());
+        }
+    }
+
+    private void refreshOutput(ComboBox<Profile> profileBox) {
+        String activeProfileText = profileService.getActiveProfile()
+                .map(profile -> "Active profile: " + profile.getName() + " (" + profile.getDefaultCurrency() + ")")
+                .orElse("No active profile selected.");
+        outputArea.setText(activeProfileText);
+        refreshProfileList(profileBox);
+    }
+}
+</file>
+
+</files>
