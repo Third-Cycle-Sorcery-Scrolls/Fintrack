@@ -1,141 +1,158 @@
 package ui;
 
-import config.DBConnection;
+import app.AppContext;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import model.Profile;
 import service.AnalyticsService;
+import service.ProfileService;
+import service.RecurringExpenseService;
 
-import java.io.InputStream;
-import java.sql.SQLException;
-import java.util.Map;
-
-public class DashboardUI {
+public class DashboardUI extends BorderPane {
+    private final AppContext appContext;
+    private final ProfileSetupUI profileSetupUI;
+    private final RecurringExpenseUI recurringExpenseUI;
     private final AnalyticsService analyticsService;
+    private final ProfileService profileService;
+    private final RecurringExpenseService recurringExpenseService;
 
-    public DashboardUI(AnalyticsService analyticsService) {
-        this.analyticsService = analyticsService;
+    public DashboardUI(AppContext appContext) {
+        this.appContext = appContext;
+        this.analyticsService = appContext.getAnalyticsService();
+        this.profileService = appContext.getProfileService();
+        this.recurringExpenseService = appContext.getRecurringExpenseService();
+
+        this.profileSetupUI = new ProfileSetupUI(profileService, () -> {
+            appContext.saveLastProfile();
+            this.setCenter(createHomeView());
+        });
+        this.recurringExpenseUI = new RecurringExpenseUI(recurringExpenseService, profileService);
+        buildView();
     }
 
-    public BorderPane buildView() {
-        BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #ecf0f1;");
-        root.setLeft(buildSidebar());
-        root.setCenter(buildMainContent());
-        return root;
+    private void buildView() {
+        this.setLeft(createSidebar());
+        this.setCenter(createHomeView());
     }
 
-    private VBox buildSidebar() {
-        Button profileBtn = menuButton("Profile Setup");
-        Button categoryBtn = menuButton("Manage Categories");
-        Button transactionBtn = menuButton("Transactions");
-        Button tagBtn = menuButton("Manage Tags");
-        Button recurringBtn = menuButton("Recurring Expenses");
+    private VBox createSidebar() {
+        VBox sidebar = new VBox(12);
+        sidebar.getStyleClass().add("sidebar");
+        sidebar.setPrefWidth(200);
 
-        profileBtn.setOnAction(e -> System.out.println("Open Profile UI"));
-        categoryBtn.setOnAction(e -> System.out.println("Open Category UI"));
-        transactionBtn.setOnAction(e -> System.out.println("Open Transaction UI"));
-        tagBtn.setOnAction(e -> System.out.println("Open Tag UI"));
-        recurringBtn.setOnAction(e -> System.out.println("Open Recurring UI"));
+        Label appTitle = new Label("Fintrack");
+        appTitle.getStyleClass().add("sidebar-title");
 
-        VBox sideMenu = new VBox(10,
-                buildSidebarIcon(),
-                profileBtn,
-                categoryBtn,
-                transactionBtn,
-                tagBtn,
-                recurringBtn
-        );
-        sideMenu.setPadding(new Insets(10));
-        sideMenu.setStyle("-fx-background-color: #34495e; -fx-pref-width: 210;");
-        sideMenu.setFillWidth(true);
-        return sideMenu;
+        Label appSubtitle = new Label("Financial Manager");
+        appSubtitle.getStyleClass().add("sidebar-subtitle");
+
+        VBox spacer = new VBox();
+        spacer.setPrefHeight(15);
+
+        Button btnHome      = createNavButton("📊 Dashboard");
+        Button btnProfile   = createNavButton("👤 Profile Setup");
+        Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnRecurring = createNavButton("🔄 Recurring Expenses");
+
+        btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
+        btnProfile.setOnAction(e   -> this.setCenter(profileSetupUI.buildView()));
+        // btnCategory.setOnAction(e  -> {
+        //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
+        //     this.setCenter(categoryUI.buildView());
+        // });
+        btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
+
+        sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
+                btnHome, btnProfile, btnCategory, btnRecurring);
+        return sidebar;
     }
 
-    private VBox buildMainContent() {
-        Label title = new Label("Fintrack Dashboard");
-        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-
-        Label dbStatus = new Label(getDatabaseStatus());
-
-        GridPane summaryGrid = new GridPane();
-        summaryGrid.setHgap(20);
-        summaryGrid.setVgap(10);
-
-        int row = 0;
-        for (Map.Entry<String, String> entry : analyticsService.buildSummary().entrySet()) {
-            Label key = new Label(entry.getKey() + ":");
-            key.setStyle("-fx-font-weight: bold;");
-            Label value = new Label(entry.getValue());
-            summaryGrid.addRow(row++, key, value);
-        }
-
-        Label ownerNote = new Label("Feature-specific UIs are implemented by teammates. Dashboard provides integration/navigation only.");
-        ownerNote.setWrapText(true);
-
-        HBox moduleSlots = new HBox(10,
-                moduleTag("Profile UI"),
-                moduleTag("Category UI"),
-                moduleTag("Transaction UI"),
-                moduleTag("Tag UI"),
-                moduleTag("Recurring UI")
-        );
-
-        VBox mainContent = new VBox(14, title, dbStatus, summaryGrid, ownerNote, moduleSlots);
-        mainContent.setPadding(new Insets(20));
-        mainContent.setAlignment(Pos.TOP_LEFT);
-        return mainContent;
+    private Button createNavButton(String text) {
+        Button btn = new Button(text);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.getStyleClass().add("nav-button");
+        return btn;
     }
 
-    private HBox buildSidebarIcon() {
-        InputStream iconStream = getClass().getResourceAsStream("/app-icon.png");
-        if (iconStream == null) {
-            Label fallbackIcon = new Label("📊");
-            fallbackIcon.setStyle("-fx-font-size: 48px;");
-            HBox box = new HBox(fallbackIcon);
-            box.setAlignment(Pos.CENTER);
-            box.setPadding(new Insets(6, 0, 10, 0));
-            return box;
-        }
+    public VBox createHomeView() {
+        VBox homeView = new VBox(20);
+        homeView.getStyleClass().add("primary-background");
+        homeView.setPadding(new Insets(30, 40, 30, 40));
 
-        ImageView logoView = new ImageView(new Image(iconStream));
-        logoView.setFitWidth(64);
-        logoView.setFitHeight(64);
-        logoView.setPreserveRatio(true);
+        Label title = new Label("Financial Overview");
+        title.getStyleClass().add("page-title");
 
-        HBox box = new HBox(logoView);
-        box.setAlignment(Pos.CENTER);
-        box.setPadding(new Insets(6, 0, 10, 0));
-        return box;
+        homeView.getChildren().addAll(title, createSummaryCards());
+        return homeView;
     }
 
-    private Button menuButton(String text) {
-        Button button = new Button(text);
-        button.setMaxWidth(Double.MAX_VALUE);
-        VBox.setVgrow(button, Priority.NEVER);
-        return button;
-    }
+    private VBox createSummaryCards() {
+        VBox container = new VBox(15);
 
-    private Label moduleTag(String text) {
-        Label label = new Label(text);
-        label.setStyle("-fx-padding: 6 10; -fx-background-color: #e8edf5; -fx-background-radius: 8;");
-        return label;
-    }
-
-    private String getDatabaseStatus() {
         try {
-            DBConnection.getConnection();
-            return "Database: Connected";
-        } catch (SQLException e) {
-            return "Database: Not connected (" + e.getMessage() + ")";
+            Profile profile = profileService.requireActiveProfile();
+
+            int categoryCount         = recurringExpenseService.findCategoriesByProfileId(profile.getId()).size();
+            int recurringExpenseCount = recurringExpenseService.findByProfileId(profile.getId()).size();
+            String netBalance         = "0.00";
+
+            var summary = analyticsService.buildSummary(0, categoryCount, recurringExpenseCount, netBalance);
+
+            GridPane statsGrid = new GridPane();
+            statsGrid.setHgap(20);
+            statsGrid.setVgap(20);
+
+            int col = 0, row = 0;
+            for (var entry : summary.entrySet()) {
+                statsGrid.add(createStatCard(entry.getKey(), entry.getValue()), col, row);
+                if (++col > 2) { col = 0; row++; }
+            }
+
+            HBox profileInfo = new HBox(15);
+            profileInfo.getStyleClass().add("card");
+
+            Label profileLabel = new Label("Active Profile: " + profile.getName());
+            profileLabel.getStyleClass().add("section-title");
+
+            Label currencyLabel = new Label("Currency: " + profile.getDefaultCurrency());
+            currencyLabel.getStyleClass().add("section-subtitle");
+
+            profileInfo.getChildren().addAll(profileLabel, currencyLabel);
+            container.getChildren().addAll(statsGrid, profileInfo);
+
+        } catch (IllegalStateException ex) {
+            Label noProfile = new Label("⚠️ No active profile. Go to Profile Setup to create or select one.");
+            noProfile.getStyleClass().add("section-subtitle");
+            container.getChildren().add(noProfile);
         }
+
+        return container;
+    }
+
+    private HBox createStatCard(String label, String value) {
+        HBox card = new HBox(10);
+        card.getStyleClass().add("stat-card");
+        card.setPrefWidth(200);
+
+        VBox content = new VBox(5);
+
+        Label labelText = new Label(label);
+        labelText.getStyleClass().add("stat-label");
+
+        Label valueText = new Label(value);
+        valueText.getStyleClass().add("stat-value");
+
+        content.getChildren().addAll(labelText, valueText);
+        card.getChildren().add(content);
+        return card;
+    }
+
+    public void refreshHomeView() {
+        this.setCenter(createHomeView());
     }
 }
