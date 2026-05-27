@@ -16,11 +16,11 @@ import java.util.List;
 import java.util.Optional;
 
 public class ProfileRepository implements Repository<Profile, Integer> {
-    private static final String SQL_INSERT = "INSERT INTO profiles (name, default_currency, created_at) VALUES (?, ?, ?)";
+    private static final String SQL_INSERT = "INSERT INTO profiles (name, default_currency, created_at) VALUES (?, ?::currency_type, ?)";
     private static final String SQL_FIND_ALL = "SELECT id, name, default_currency, created_at FROM profiles ORDER BY name";
     private static final String SQL_FIND_BY_ID = "SELECT id, name, default_currency, created_at FROM profiles WHERE id = ?";
     private static final String SQL_FIND_BY_NAME = "SELECT id, name, default_currency, created_at FROM profiles WHERE LOWER(name) = LOWER(?)";
-    private static final String SQL_UPDATE = "UPDATE profiles SET name = ?, default_currency = ? WHERE id = ?";
+    private static final String SQL_UPDATE = "UPDATE profiles SET name = ?, default_currency = ?::currency_type WHERE id = ?";
     private static final String SQL_DELETE = "DELETE FROM profiles WHERE id = ?";
 
     @Override
