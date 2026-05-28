@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="ui.controllers.TagController"
+      styleClass="tag-root"
+      spacing="16">
+    <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
+
+    <Label text="Tag Management" styleClass="tag-page-title"/>
+
+    <!-- Tag list card -->
+    <VBox styleClass="tag-card" spacing="10">
+        <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+
+        <Label text="Tags"/>
+
+        <TextField fx:id="searchField" promptText="Search tags..." styleClass="tag-input"/>
+
+        <ListView fx:id="tagList" prefHeight="200"/>
+
+        <Label text="Tag name"/>
+        <TextField fx:id="nameField" promptText="Tag name" styleClass="tag-input"/>
+
+        <HBox spacing="8">
+            <Button fx:id="addButton"     text="Add"     styleClass="tag-btn-primary"   onAction="#handleAdd"/>
+            <Button fx:id="updateButton"  text="Update"  styleClass="tag-btn-secondary" onAction="#handleUpdate"/>
+            <Button fx:id="deleteButton"  text="Delete"  styleClass="tag-btn-danger"    onAction="#handleDelete"/>
+            <Button fx:id="refreshButton" text="Refresh" styleClass="tag-btn-secondary" onAction="#handleRefresh"/>
+        </HBox>
+    </VBox>
+
+    <!-- Transaction assignment card -->
+    <VBox styleClass="tag-card" spacing="10">
+        <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+
+        <Label text="Assign / Remove Tag from Transaction"/>
+        <Label text="Transaction ID"/>
+        <TextField fx:id="transactionIdField" promptText="Transaction ID" styleClass="tag-input"/>
+
+        <HBox spacing="8">
+            <Button fx:id="assignButton" text="Assign to Transaction"    styleClass="tag-btn-primary" onAction="#handleAssign"/>
+            <Button fx:id="removeButton" text="Remove from Transaction"  styleClass="tag-btn-danger"  onAction="#handleRemove"/>
+        </HBox>
+    </VBox>
+
+    <TextArea fx:id="outputArea" editable="false" prefRowCount="3" styleClass="tag-output"/>
+</VBox>

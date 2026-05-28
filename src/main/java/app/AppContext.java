@@ -54,11 +54,17 @@ public class AppContext {
     }
 
     public void restoreLastProfile() {
-        int savedId = PREFS.getInt(PREF_LAST_PROFILE_ID, -1);
-        if (savedId != -1) {
+    int savedId = PREFS.getInt(PREF_LAST_PROFILE_ID, -1);
+    if (savedId != -1) {
+        try {
             profileService.findById(savedId).ifPresent(profileService::setActiveProfile);
+        } catch (Exception e) {
+            // DB unavailable or profile deleted — start with no active profile
+            // The UI already handles the "no active profile" state gracefully
+            System.err.println("Could not restore last profile: " + e.getMessage());
         }
     }
+}
 
     public void shutdown() {
         saveLastProfile();

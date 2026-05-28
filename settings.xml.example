@@ -1,0 +1,16 @@
+<!-- Copy this file to C:\Users\<you>\.m2\settings.xml and fill in your values -->
+<settings>
+    <profiles>
+        <profile>
+            <id>fintrack-local</id>
+            <properties>
+                <db.name>your_actual_db_name</db.name>
+                <db.user>postgres</db.user>
+                <db.password>FILL_IN</db.password>
+            </properties>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>fintrack-local</activeProfile>
+    </activeProfiles>
+</settings>
