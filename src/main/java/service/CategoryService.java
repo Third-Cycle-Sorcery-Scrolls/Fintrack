@@ -82,7 +82,10 @@ public class CategoryService {
     public List<Category> getCategoriesForProfile(int profileId) {
         return categoryRepository.findAllByProfileId(profileId);
     }
-
+    
+    public List<Category> findAll() {
+         return categoryRepository.findAll();
+    }
     // ── Get by id ─────────────────────────────────────────────────────────────
 
     /**
