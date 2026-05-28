@@ -151,6 +151,44 @@
     -fx-background-color: #1a2332;
 }
 
+/* ── Button danger (Delete) — red ────────────────────────────────────────── */
+.button-danger {
+    -fx-background-color: #8b1a1a;
+    -fx-text-fill: #ffffff;
+    -fx-padding: 10 15 10 15;
+    -fx-font-size: 12px;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+}
+
+.button-danger:hover {
+    -fx-background-color: #b22222;
+}
+
+.button-danger:pressed {
+    -fx-background-color: #6b0f0f;
+}
+
+/* ── Button warning (Edit) — orange ──────────────────────────────────────── */
+.button-warning {
+    -fx-background-color: #ea9b4c;
+    -fx-text-fill: #ffffff;
+    -fx-padding: 10 15 10 15;
+    -fx-font-size: 12px;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+}
+
+.button-warning:hover {
+    -fx-background-color: #d4700a;
+}
+
+.button-warning:pressed {
+    -fx-background-color: #8a4400;
+}
+
 /* TextArea */
 .text-area {
     -fx-background-color: #1a2332;
