@@ -14,37 +14,33 @@ import service.AnalyticsService;
 import service.ProfileService;
 import service.RecurringExpenseService;
 import service.TransactionService;
+import ui.controllers.TagController;
 
 import java.util.List;
-import ui.controllers.TagController;
 
 public class DashboardUI extends BorderPane {
     private final AppContext appContext;
-    private ProfileSetupUI profileSetupUI;
+    private final ProfileSetupUI profileSetupUI;
     private final CategoryUI categoryUI;
     private final RecurringExpenseUI recurringExpenseUI;
     private final TagController tagController;
     private final AnalyticsService analyticsService;
     private final ProfileService profileService;
     private final RecurringExpenseService recurringExpenseService;
-    private final TransactionService transactionService; // was missing
+    private final TransactionService transactionService;
 
     public DashboardUI(AppContext appContext) {
         this.appContext = appContext;
-        this.analyticsService        = appContext.getAnalyticsService();
-        this.profileService          = appContext.getProfileService();
+        this.analyticsService = appContext.getAnalyticsService();
+        this.profileService = appContext.getProfileService();
         this.recurringExpenseService = appContext.getRecurringExpenseService();
-        this.transactionService      = appContext.getTransactionService(); // was missing
+        this.transactionService = appContext.getTransactionService();
 
         this.profileSetupUI = new ProfileSetupUI(profileService, () -> {
             appContext.saveLastProfile();
-            if (appContext.getProfileService().getActiveProfile().isEmpty()) {
-                this.setCenter(profileSetupUI.buildView());
-            } else {
-                this.setCenter(createHomeView());
-            }
+            refreshHomeView();
         });
-        this.categoryUI        = new CategoryUI(appContext.getCategoryService(), appContext.getProfileService());
+        this.categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
         this.recurringExpenseUI = new RecurringExpenseUI(recurringExpenseService, profileService);
         this.tagController = new TagController(appContext.getTagService(), profileService);
         buildView();
@@ -69,27 +65,40 @@ public class DashboardUI extends BorderPane {
         VBox spacer = new VBox();
         spacer.setPrefHeight(15);
 
-        Button btnHome      = createNavButton("📊 Dashboard");
-        Button btnProfile   = createNavButton("👤 Profile Setup");
-        Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnHome = createNavButton("📊 Dashboard");
+        Button btnProfile = createNavButton("👤 Profile Setup");
+        Button btnCategory = createNavButton("🗂 Categories");
         Button btnTransaction = createNavButton("💳 Transactions");
         Button btnRecurring = createNavButton("🔄 Recurring Expenses");
+        Button btnTag = createNavButton("🏷 Tag Management");
 
-        btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
-        btnProfile.setOnAction(e   -> this.setCenter(profileSetupUI.buildView()));
-        // btnCategory.setOnAction(e  -> {
-        //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
-        //     this.setCenter(categoryUI.buildView());
-        // });
-        btnTransaction.setOnAction(e -> {
-            TransactionUI transactionUI = new TransactionUI(
-                
-                    appContext.getTransactionService(), profileService,
-                appContext.getCategoryService(), appContext.getTagService());
-            if(requireActiveProfile()) this.setCenter(transactionUI.buildView());
+        btnHome.setOnAction(e -> refreshHomeView());
+        btnProfile.setOnAction(e -> showProfileSetup());
+        btnCategory.setOnAction(e -> {
+            if (requireActiveProfile()) {
+                this.setCenter(categoryUI.buildView());
+            }
         });
-        btnCategory.setOnAction(e  -> this.setCenter(categoryUI.buildView()));
-        btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
+        btnTransaction.setOnAction(e -> {
+            if (requireActiveProfile()) {
+                TransactionUI transactionUI = new TransactionUI(
+                        appContext.getTransactionService(),
+                        profileService,
+                        appContext.getCategoryService(),
+                        appContext.getTagService());
+                this.setCenter(transactionUI.buildView());
+            }
+        });
+        btnRecurring.setOnAction(e -> {
+            if (requireActiveProfile()) {
+                this.setCenter(recurringExpenseUI.buildView());
+            }
+        });
+        btnTag.setOnAction(e -> {
+            if (requireActiveProfile()) {
+                this.setCenter(tagController.buildView());
+            }
+        });
 
         sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
                 btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring, btnTag);
@@ -121,10 +130,9 @@ public class DashboardUI extends BorderPane {
         try {
             Profile profile = profileService.requireActiveProfile();
 
-            // Fetch real data — previously all three of these were hardcoded
             List<Transaction> transactions = transactionService.getTransactionsForProfile(profile.getId());
-            int categoryCount              = recurringExpenseService.findCategoriesByProfileId(profile.getId()).size();
-            int recurringExpenseCount      = recurringExpenseService.findByProfileId(profile.getId()).size();
+            int categoryCount = recurringExpenseService.findCategoriesByProfileId(profile.getId()).size();
+            int recurringExpenseCount = recurringExpenseService.findByProfileId(profile.getId()).size();
 
             var summary = analyticsService.buildSummary(transactions, categoryCount, recurringExpenseCount);
 
@@ -132,10 +140,14 @@ public class DashboardUI extends BorderPane {
             statsGrid.setHgap(20);
             statsGrid.setVgap(20);
 
-            int col = 0, row = 0;
+            int col = 0;
+            int row = 0;
             for (var entry : summary.entrySet()) {
                 statsGrid.add(createStatCard(entry.getKey(), entry.getValue()), col, row);
-                if (++col > 2) { col = 0; row++; }
+                if (++col > 2) {
+                    col = 0;
+                    row++;
+                }
             }
 
             HBox profileInfo = new HBox(15);
@@ -149,7 +161,6 @@ public class DashboardUI extends BorderPane {
 
             profileInfo.getChildren().addAll(profileLabel, currencyLabel);
             container.getChildren().addAll(statsGrid, profileInfo);
-
         } catch (IllegalStateException ex) {
             Label noProfile = new Label("⚠️ No active profile. Go to Profile Setup to create or select one.");
             noProfile.getStyleClass().add("section-subtitle");
@@ -184,9 +195,10 @@ public class DashboardUI extends BorderPane {
     public void showProfileSetup() {
         this.setCenter(profileSetupUI.buildView());
     }
+
     private boolean requireActiveProfile() {
         if (profileService.getActiveProfile().isEmpty()) {
-            this.setCenter(profileSetupUI.buildView());
+            showProfileSetup();
             return false;
         }
         return true;

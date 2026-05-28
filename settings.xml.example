@@ -1,12 +1,22 @@
-<!-- Copy this file to C:\Users\<you>\.m2\settings.xml and fill in your values -->
+<!--
+Copy this file to your Maven settings location and fill in your local PostgreSQL values:
+- Windows: C:\Users\<you>\.m2\settings.xml
+- macOS/Linux: ~/.m2/settings.xml
+
+These properties are passed to the app by the JavaFX Maven plugin as DB_* system properties.
+You can also skip Maven settings and use environment variables directly:
+DB_NAME, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, or DB_URL.
+-->
 <settings>
     <profiles>
         <profile>
             <id>fintrack-local</id>
             <properties>
-                <db.name>your_actual_db_name</db.name>
+                <db.name>finance_tracker</db.name>
+                <db.host>localhost</db.host>
+                <db.port>5432</db.port>
                 <db.user>postgres</db.user>
-                <db.password>FILL_IN</db.password>
+                <db.password>password</db.password>
             </properties>
         </profile>
     </profiles>
