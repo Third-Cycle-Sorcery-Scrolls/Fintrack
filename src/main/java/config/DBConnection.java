@@ -5,9 +5,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DBConnection {
-    private static final String URL = "jdbc:postgresql://localhost:5432/finance_tracker";
-    private static final String USER = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "postgres";
-    private static final String PASSWORD = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "password";
+    private static final String URL = "jdbc:postgresql://localhost:5432/" + (System.getProperty("DB_NAME") != null ? System.getProperty("DB_NAME"): System.getenv("DB_NAME") != null ? System.getenv("DB_NAME") : "finance_tracker");
+    private static final String USER = System.getProperty("DB_USER") != null ? System.getProperty("DB_USER") : System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "postgres";
+    private static final String PASSWORD = System.getProperty("DB_PASSWORD") != null ? System.getProperty("DB_PASSWORD") : System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "password";
 
     private static Connection connection = null;
 

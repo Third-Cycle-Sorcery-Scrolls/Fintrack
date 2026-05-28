@@ -9,30 +9,40 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import model.Profile;
+import model.Transaction;
 import service.AnalyticsService;
 import service.ProfileService;
 import service.RecurringExpenseService;
+import service.TransactionService;
+
+import java.util.List;
 
 public class DashboardUI extends BorderPane {
     private final AppContext appContext;
-    private final ProfileSetupUI profileSetupUI;
+    private ProfileSetupUI profileSetupUI;
     private final CategoryUI categoryUI;
     private final RecurringExpenseUI recurringExpenseUI;
     private final AnalyticsService analyticsService;
     private final ProfileService profileService;
     private final RecurringExpenseService recurringExpenseService;
+    private final TransactionService transactionService; // was missing
 
     public DashboardUI(AppContext appContext) {
         this.appContext = appContext;
-        this.analyticsService = appContext.getAnalyticsService();
-        this.profileService = appContext.getProfileService();
+        this.analyticsService        = appContext.getAnalyticsService();
+        this.profileService          = appContext.getProfileService();
         this.recurringExpenseService = appContext.getRecurringExpenseService();
+        this.transactionService      = appContext.getTransactionService(); // was missing
 
         this.profileSetupUI = new ProfileSetupUI(profileService, () -> {
             appContext.saveLastProfile();
-            this.setCenter(createHomeView());
+            if (appContext.getProfileService().getActiveProfile().isEmpty()) {
+                this.setCenter(profileSetupUI.buildView());
+            } else {
+                this.setCenter(createHomeView());
+            }
         });
-        this.categoryUI = new CategoryUI(appContext.getCategoryService(), appContext.getProfileService());
+        this.categoryUI        = new CategoryUI(appContext.getCategoryService(), appContext.getProfileService());
         this.recurringExpenseUI = new RecurringExpenseUI(recurringExpenseService, profileService);
         buildView();
     }
@@ -56,27 +66,24 @@ public class DashboardUI extends BorderPane {
         VBox spacer = new VBox();
         spacer.setPrefHeight(15);
 
-        Button btnHome      = createNavButton("📊 Dashboard");
-        Button btnProfile   = createNavButton("👤 Profile Setup");
-        Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnHome       = createNavButton("📊 Dashboard");
+        Button btnProfile    = createNavButton("👤 Profile Setup");
         Button btnTransaction = createNavButton("💳 Transactions");
-        Button btnRecurring = createNavButton("🔄 Recurring Expenses");
+        Button btnRecurring  = createNavButton("🔄 Recurring Expenses");
+        Button btnCategory   = createNavButton("🗂 Categories");
 
-        btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
-        btnProfile.setOnAction(e   -> this.setCenter(profileSetupUI.buildView()));
-        // btnCategory.setOnAction(e  -> {
-        //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
-        //     this.setCenter(categoryUI.buildView());
-        // });
+        btnHome.setOnAction(e -> {if(requireActiveProfile()) this.setCenter(createHomeView());});
+        btnProfile.setOnAction(e -> this.setCenter(profileSetupUI.buildView()));
         btnTransaction.setOnAction(e -> {
-            TransactionUI transactionUI = new TransactionUI(appContext.getTransactionService(), profileService, appContext.getCategoryService());
-            this.setCenter(transactionUI.buildView());
+            TransactionUI transactionUI = new TransactionUI(
+                    appContext.getTransactionService(), profileService, appContext.getCategoryService());
+            if(requireActiveProfile()) this.setCenter(transactionUI.buildView());
         });
-        btnCategory.setOnAction(e  -> this.setCenter(categoryUI.buildView()));
-        btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
+        btnCategory.setOnAction(e  -> {if(requireActiveProfile()) this.setCenter(categoryUI.buildView());});
+        btnRecurring.setOnAction(e -> {if(requireActiveProfile()) this.setCenter(recurringExpenseUI.buildView());});
 
         sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
-            btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring);
+                btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring);
         return sidebar;
     }
 
@@ -105,11 +112,12 @@ public class DashboardUI extends BorderPane {
         try {
             Profile profile = profileService.requireActiveProfile();
 
-            int categoryCount         = recurringExpenseService.findCategoriesByProfileId(profile.getId()).size();
-            int recurringExpenseCount = recurringExpenseService.findByProfileId(profile.getId()).size();
-            String netBalance         = "0.00";
+            // Fetch real data — previously all three of these were hardcoded
+            List<Transaction> transactions = transactionService.getTransactionsForProfile(profile.getId());
+            int categoryCount              = recurringExpenseService.findCategoriesByProfileId(profile.getId()).size();
+            int recurringExpenseCount      = recurringExpenseService.findByProfileId(profile.getId()).size();
 
-            var summary = analyticsService.buildSummary(0, categoryCount, recurringExpenseCount, netBalance);
+            var summary = analyticsService.buildSummary(transactions, categoryCount, recurringExpenseCount);
 
             GridPane statsGrid = new GridPane();
             statsGrid.setHgap(20);
@@ -162,5 +170,16 @@ public class DashboardUI extends BorderPane {
 
     public void refreshHomeView() {
         this.setCenter(createHomeView());
+    }
+
+    public void showProfileSetup() {
+        this.setCenter(profileSetupUI.buildView());
+    }
+    private boolean requireActiveProfile() {
+        if (profileService.getActiveProfile().isEmpty()) {
+            this.setCenter(profileSetupUI.buildView());
+            return false;
+        }
+        return true;
     }
 }

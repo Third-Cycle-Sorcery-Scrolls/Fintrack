@@ -35,6 +35,11 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>main.Main</mainClass>
+                    <options>
+                        <option>-DDB_NAME=${db.name}</option>
+                        <option>-DDB_USER=${db.user}</option>
+                        <option>-DDB_PASSWORD=${db.password}</option>
+                    </options>
                 </configuration>
             </plugin>
         </plugins>

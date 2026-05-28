@@ -37,6 +37,12 @@ public class Main extends Application {
 
         appContext.restoreLastProfile();
         dashboardUI.refreshHomeView(); // Ensure home view reflects the restored profile immediately
+        // If no active profile was restored, send the user to Profile Setup immediately
+        if (appContext.getProfileService().getActiveProfile().isEmpty()) {
+            dashboardUI.showProfileSetup();
+        } else {
+            dashboardUI.refreshHomeView();
+        }
     }
 
     public static void main(String[] args) {
