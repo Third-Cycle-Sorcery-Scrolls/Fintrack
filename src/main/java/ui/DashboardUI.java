@@ -59,15 +59,24 @@ public class DashboardUI extends BorderPane {
         Button btnHome      = createNavButton("📊 Dashboard");
         Button btnProfile   = createNavButton("👤 Profile Setup");
         Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnTransaction = createNavButton("💳 Transactions");
         Button btnRecurring = createNavButton("🔄 Recurring Expenses");
 
         btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
         btnProfile.setOnAction(e   -> this.setCenter(profileSetupUI.buildView()));
+        // btnCategory.setOnAction(e  -> {
+        //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
+        //     this.setCenter(categoryUI.buildView());
+        // });
+        btnTransaction.setOnAction(e -> {
+            TransactionUI transactionUI = new TransactionUI(appContext.getTransactionService(), profileService, appContext.getCategoryService());
+            this.setCenter(transactionUI.buildView());
+        });
         btnCategory.setOnAction(e  -> this.setCenter(categoryUI.buildView()));
         btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
 
         sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
-                btnHome, btnProfile, btnCategory, btnRecurring);
+            btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring);
         return sidebar;
     }
 
