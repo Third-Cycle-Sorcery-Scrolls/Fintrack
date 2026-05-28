@@ -9,6 +9,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
@@ -17,21 +18,25 @@ import javafx.scene.layout.VBox;
 import model.Category;
 import model.Currency;
 import model.Profile;
+import model.Tag;
 import model.Transaction;
 import model.TransactionType;
 import service.CategoryService;
 import service.ProfileService;
+import service.TagService;
 import service.TransactionService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Objects;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class TransactionUI {
     private final TransactionService transactionService;
     private final ProfileService profileService;
     private final CategoryService categoryService;
+    private final TagService tagService;
 
     private final ListView<Transaction> transactionList = new ListView<>();
     private final TextArea outputArea = new TextArea();
@@ -43,6 +48,10 @@ public class TransactionUI {
     private final ComboBox<Category> categoryBox = new ComboBox<>();
     private final TextField descriptionField = new TextField();
 
+    // Tag controls
+    private final ListView<Tag> tagListView = new ListView<>();
+    private final TextField newTagField = new TextField();
+
     private final ComboBox<TransactionType> filterTypeBox = new ComboBox<>();
     private final ComboBox<Category> filterCategoryBox = new ComboBox<>();
     private final DatePicker fromDatePicker = new DatePicker();
@@ -52,9 +61,17 @@ public class TransactionUI {
     public TransactionUI(TransactionService transactionService,
                          ProfileService profileService,
                          CategoryService categoryService) {
+        this(transactionService, profileService, categoryService, null);
+    }
+
+    public TransactionUI(TransactionService transactionService,
+                         ProfileService profileService,
+                         CategoryService categoryService,
+                         TagService tagService) {
         this.transactionService = transactionService;
         this.profileService = profileService;
         this.categoryService = categoryService;
+        this.tagService = tagService;
     }
 
     public ScrollPane buildView() {
@@ -64,6 +81,7 @@ public class TransactionUI {
         setupFormControls();
         setupFilterControls();
         setupTransactionList();
+        setupTagControls();
 
         Button createButton = new Button("Create");
         Button updateButton = new Button("Update Selected");
@@ -71,15 +89,18 @@ public class TransactionUI {
         Button refreshButton = new Button("Refresh");
         Button filterButton = new Button("Apply Filters");
         Button clearFiltersButton = new Button("Clear Filters");
+        Button addTagButton = new Button("Add Tag");
 
-        transactionList.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, selected) -> populateForm(selected));
+        transactionList.getSelectionModel().selectedItemProperty()
+                .addListener((obs, oldVal, selected) -> populateForm(selected));
 
-        createButton.setOnAction(event -> handleCreate());
-        updateButton.setOnAction(event -> handleUpdate());
-        deleteButton.setOnAction(event -> handleDelete());
-        refreshButton.setOnAction(event -> refreshTransactions());
-        filterButton.setOnAction(event -> applyFilters());
-        clearFiltersButton.setOnAction(event -> clearFilters());
+        createButton.setOnAction(e -> handleCreate());
+        updateButton.setOnAction(e -> handleUpdate());
+        deleteButton.setOnAction(e -> handleDelete());
+        refreshButton.setOnAction(e -> refreshTransactions());
+        filterButton.setOnAction(e -> applyFilters());
+        clearFiltersButton.setOnAction(e -> clearFilters());
+        addTagButton.setOnAction(e -> handleAddNewTag());
 
         GridPane filterGrid = new GridPane();
         filterGrid.setHgap(12);
@@ -100,6 +121,14 @@ public class TransactionUI {
         formGrid.addRow(4, new Label("Category"), categoryBox);
         formGrid.addRow(5, new Label("Description"), descriptionField);
 
+        // Tag section
+        HBox newTagRow = new HBox(8, newTagField, addTagButton);
+        VBox tagSection = new VBox(6,
+                new Label("Tags (hold Ctrl/Cmd to select multiple)"),
+                tagListView,
+                new Label("Quick-create new tag:"),
+                newTagRow);
+
         HBox filterButtons = new HBox(10, filterButton, clearFiltersButton, refreshButton);
         HBox crudButtons = new HBox(10, createButton, updateButton, deleteButton);
 
@@ -114,6 +143,7 @@ public class TransactionUI {
                 transactionList,
                 new Label("Add or Edit Transaction"),
                 formGrid,
+                tagSection,
                 crudButtons,
                 outputArea);
         content.setPadding(new Insets(18));
@@ -149,18 +179,23 @@ public class TransactionUI {
             @Override
             protected void updateItem(Transaction item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatTransaction(item));
-                }
+                setText((empty || item == null) ? null : formatTransaction(item));
             }
         });
     }
 
+    private void setupTagControls() {
+        tagListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        tagListView.setPrefHeight(120);
+        newTagField.setPromptText("New tag name...");
+    }
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
     private void handleCreate() {
         try {
             Profile profile = profileService.requireActiveProfile();
+            List<Integer> tagIds = selectedTagIds();
             Transaction saved = transactionService.createTransaction(
                     profile.getId(),
                     datePicker.getValue(),
@@ -168,8 +203,10 @@ public class TransactionUI {
                     typeBox.getValue(),
                     currencyBox.getValue(),
                     selectedCategoryId(categoryBox.getValue()),
-                    descriptionField.getText());
-            outputArea.setText("Transaction created: " + saved.getId());
+                    descriptionField.getText(),
+                    tagIds);
+            outputArea.setText("Transaction created: " + saved.getId()
+                    + (tagIds.isEmpty() ? "" : " with " + tagIds.size() + " tag(s)."));
             clearForm();
             applyFilters();
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -181,6 +218,7 @@ public class TransactionUI {
         try {
             Transaction selected = requireSelectedTransaction();
             Profile profile = profileService.requireActiveProfile();
+            List<Integer> tagIds = selectedTagIds();
             Transaction updated = transactionService.updateTransaction(
                     selected.getId(),
                     profile.getId(),
@@ -189,8 +227,10 @@ public class TransactionUI {
                     typeBox.getValue(),
                     currencyBox.getValue(),
                     selectedCategoryId(categoryBox.getValue()),
-                    descriptionField.getText());
-            outputArea.setText("Transaction updated: " + updated.getId());
+                    descriptionField.getText(),
+                    tagIds);
+            outputArea.setText("Transaction updated: " + updated.getId()
+                    + " — tags synced (" + tagIds.size() + ").");
             applyFilters();
         } catch (IllegalArgumentException | IllegalStateException ex) {
             outputArea.setText(ex.getMessage());
@@ -208,6 +248,32 @@ public class TransactionUI {
             outputArea.setText(ex.getMessage());
         }
     }
+
+    /** Quick-create a new tag for the active profile and select it. */
+    private void handleAddNewTag() {
+        if (tagService == null) {
+            outputArea.setText("Tag service not available.");
+            return;
+        }
+        String name = newTagField.getText().trim();
+        if (name.isEmpty()) {
+            outputArea.setText("Enter a tag name first.");
+            return;
+        }
+        try {
+            Profile profile = profileService.requireActiveProfile();
+            Tag created = tagService.createTag(profile.getId(), name);
+            newTagField.clear();
+            refreshTagList();
+            // Auto-select the newly created tag
+            tagListView.getSelectionModel().select(created);
+            outputArea.setText("Tag \"" + created.getName() + "\" created and selected.");
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            outputArea.setText(ex.getMessage());
+        }
+    }
+
+    // ── Filter / refresh ──────────────────────────────────────────────────────
 
     private void applyFilters() {
         try {
@@ -245,26 +311,37 @@ public class TransactionUI {
             Profile profile = profileService.requireActiveProfile();
             List<Category> categories = categoryService.getCategoriesForProfile(profile.getId());
             categoryBox.getItems().setAll(categories);
-            // Allow "All Categories" selection (null) while still listing categories
             filterCategoryBox.getItems().setAll((Category) null);
             filterCategoryBox.getItems().addAll(categories);
             if (currencyBox.getValue() == null) {
                 currencyBox.setValue(profile.getDefaultCurrency());
             }
             transactionList.getItems().setAll(transactionService.getTransactionsForProfile(profile.getId()));
+            refreshTagList();
             outputArea.setText("Loaded " + transactionList.getItems().size() + " transaction(s).");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             transactionList.getItems().clear();
             categoryBox.getItems().clear();
             filterCategoryBox.getItems().clear();
+            tagListView.getItems().clear();
             outputArea.setText(ex.getMessage());
         }
     }
 
-    private void populateForm(Transaction selected) {
-        if (selected == null) {
-            return;
+    private void refreshTagList() {
+        if (tagService == null) return;
+        try {
+            Profile profile = profileService.requireActiveProfile();
+            tagListView.getItems().setAll(tagService.getAllTagsForProfile(profile.getId()));
+        } catch (RuntimeException ex) {
+            tagListView.getItems().clear();
         }
+    }
+
+    // ── Populate form on selection ────────────────────────────────────────────
+
+    private void populateForm(Transaction selected) {
+        if (selected == null) return;
 
         datePicker.setValue(selected.getDate());
         amountField.setText(selected.getAmount() == null ? "" : selected.getAmount().toPlainString());
@@ -274,14 +351,33 @@ public class TransactionUI {
 
         Category matchedCategory = null;
         if (selected.getCategoryId() != null) {
-            for (Category category : categoryBox.getItems()) {
-                if (Objects.equals(category.getId(), selected.getCategoryId())) {
-                    matchedCategory = category;
+            for (Category c : categoryBox.getItems()) {
+                if (Objects.equals(c.getId(), selected.getCategoryId())) {
+                    matchedCategory = c;
                     break;
                 }
             }
         }
         categoryBox.setValue(matchedCategory);
+
+        // Load and select assigned tags
+        tagListView.getSelectionModel().clearSelection();
+        List<Tag> assignedTags = transactionService.getTagsForTransaction(selected.getId());
+        for (Tag assigned : assignedTags) {
+            for (Tag available : tagListView.getItems()) {
+                if (available.getId() == assigned.getId()) {
+                    tagListView.getSelectionModel().select(available);
+                    break;
+                }
+            }
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private List<Integer> selectedTagIds() {
+        return tagListView.getSelectionModel().getSelectedItems()
+                .stream().map(Tag::getId).collect(Collectors.toList());
     }
 
     private BigDecimal parseAmount(String amountText) {
@@ -298,37 +394,19 @@ public class TransactionUI {
 
     private Transaction requireSelectedTransaction() {
         Transaction selected = transactionList.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            throw new IllegalArgumentException("Select a transaction first.");
-        }
+        if (selected == null) throw new IllegalArgumentException("Select a transaction first.");
         return selected;
     }
 
-    private String formatTransaction(Transaction transaction) {
+    private String formatTransaction(Transaction t) {
         String categoryName = "Uncategorized";
-        if (transaction.getCategoryId() != null) {
-            Category category = categoryService.getCategoryById(transaction.getCategoryId());
-            if (category != null) {
-                categoryName = category.getName();
-            }
+        if (t.getCategoryId() != null) {
+            Category c = categoryService.getCategoryById(t.getCategoryId());
+            if (c != null) categoryName = c.getName();
         }
-
-        String description = transaction.getDescription();
-        if (description == null || description.isBlank()) {
-            description = "No description";
-        }
-
-        return transaction.getDate()
-                + " | "
-                + transaction.getType()
-                + " | "
-                + transaction.getAmount()
-                + " "
-                + transaction.getCurrency()
-                + " | "
-                + categoryName
-                + " | "
-                + description;
+        String desc = (t.getDescription() == null || t.getDescription().isBlank()) ? "No description" : t.getDescription();
+        return t.getDate() + " | " + t.getType() + " | " + t.getAmount() + " " + t.getCurrency()
+                + " | " + categoryName + " | " + desc;
     }
 
     private void clearForm() {
@@ -337,5 +415,6 @@ public class TransactionUI {
         typeBox.setValue(TransactionType.EXPENSE);
         descriptionField.clear();
         categoryBox.setValue(null);
+        tagListView.getSelectionModel().clearSelection();
     }
 }

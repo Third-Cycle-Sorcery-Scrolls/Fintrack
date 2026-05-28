@@ -22,6 +22,7 @@ CREATE TABLE tags (
     id         SERIAL PRIMARY KEY,
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     name       TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT Null DEFAULT now(),
     CONSTRAINT unique_profile_tag UNIQUE (profile_id, name)
 );
 

@@ -12,12 +12,14 @@ import model.Profile;
 import service.AnalyticsService;
 import service.ProfileService;
 import service.RecurringExpenseService;
+import ui.controllers.TagController;
 
 public class DashboardUI extends BorderPane {
     private final AppContext appContext;
     private final ProfileSetupUI profileSetupUI;
     private final CategoryUI categoryUI;
     private final RecurringExpenseUI recurringExpenseUI;
+    private final TagController tagController;
     private final AnalyticsService analyticsService;
     private final ProfileService profileService;
     private final RecurringExpenseService recurringExpenseService;
@@ -34,6 +36,7 @@ public class DashboardUI extends BorderPane {
         });
         this.categoryUI = new CategoryUI(appContext.getCategoryService(), appContext.getProfileService());
         this.recurringExpenseUI = new RecurringExpenseUI(recurringExpenseService, profileService);
+        this.tagController = new TagController(appContext.getTagService(), profileService);
         buildView();
     }
 
@@ -56,27 +59,27 @@ public class DashboardUI extends BorderPane {
         VBox spacer = new VBox();
         spacer.setPrefHeight(15);
 
-        Button btnHome      = createNavButton("📊 Dashboard");
-        Button btnProfile   = createNavButton("👤 Profile Setup");
-        Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnHome        = createNavButton("📊 Dashboard");
+        Button btnProfile     = createNavButton("👤 Profile Setup");
+        Button btnCategory    = createNavButton("🗂 Categories");
         Button btnTransaction = createNavButton("💳 Transactions");
-        Button btnRecurring = createNavButton("🔄 Recurring Expenses");
+        Button btnRecurring   = createNavButton("🔄 Recurring Expenses");
+        Button btnTag         = createNavButton("🏷 Tag Management");
 
-        btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
-        btnProfile.setOnAction(e   -> this.setCenter(profileSetupUI.buildView()));
-        // btnCategory.setOnAction(e  -> {
-        //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
-        //     this.setCenter(categoryUI.buildView());
-        // });
+        btnHome.setOnAction(e        -> this.setCenter(createHomeView()));
+        btnProfile.setOnAction(e     -> this.setCenter(profileSetupUI.buildView()));
+        btnCategory.setOnAction(e    -> this.setCenter(categoryUI.buildView()));
         btnTransaction.setOnAction(e -> {
-            TransactionUI transactionUI = new TransactionUI(appContext.getTransactionService(), profileService, appContext.getCategoryService());
+            TransactionUI transactionUI = new TransactionUI(
+                appContext.getTransactionService(), profileService,
+                appContext.getCategoryService(), appContext.getTagService());
             this.setCenter(transactionUI.buildView());
         });
-        btnCategory.setOnAction(e  -> this.setCenter(categoryUI.buildView()));
-        btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
+        btnRecurring.setOnAction(e   -> this.setCenter(recurringExpenseUI.buildView()));
+        btnTag.setOnAction(e         -> this.setCenter(tagController.buildView()));
 
         sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
-            btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring);
+            btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring, btnTag);
         return sidebar;
     }
 

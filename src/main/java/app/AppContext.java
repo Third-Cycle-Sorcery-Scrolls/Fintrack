@@ -6,15 +6,14 @@ import remote.CalculatorClient;
 import repository.CategoryRepository;
 import repository.ProfileRepository;
 import repository.RecurringExpenseRepository;
-// import repository.TagRepository;
+import repository.TagRepository;
 import repository.TransactionRepository;
 import service.AnalyticsService;
 import service.CategoryService;
 import service.ProfileService;
 import service.RecurringExpenseService;
+import service.TagService;
 import service.TransactionService;
-// import service.TagService;
-// import service.TransactionService;
 
 public class AppContext {
     private static final String PREF_LAST_PROFILE_ID = "lastProfileId";
@@ -23,42 +22,29 @@ public class AppContext {
     private final ProfileRepository profileRepository = new ProfileRepository();
     private final CategoryRepository categoryRepository = new CategoryRepository();
     private final TransactionRepository transactionRepository = new TransactionRepository();
-    // private final TagRepository tagRepository = new TagRepository();
+    private final TagRepository tagRepository = new TagRepository();
     private final RecurringExpenseRepository recurringExpenseRepository = new RecurringExpenseRepository();
 
     private final CalculatorClient calculatorClient = new CalculatorClient();
     private final ProfileService profileService = new ProfileService(profileRepository);
     private final CategoryService categoryService = new CategoryService(categoryRepository);
     private final TransactionService transactionService = new TransactionService(transactionRepository, profileService, categoryService);
-    // private final TagService tagService = new TagService(tagRepository);
+    private final TagService tagService = new TagService(tagRepository);
+
+    {
+        // Wire TagService into TransactionService after both are constructed
+        transactionService.setTagService(tagService);
+    }
     private final RecurringExpenseService recurringExpenseService = new RecurringExpenseService(recurringExpenseRepository);
     private final AnalyticsService analyticsService = new AnalyticsService();
 
-    public CalculatorClient getCalculatorClient() {
-        return calculatorClient;
-    }
-
-    public ProfileService getProfileService() {
-        return profileService;
-    }
-
+    public CalculatorClient getCalculatorClient() { return calculatorClient; }
+    public ProfileService getProfileService() { return profileService; }
     public CategoryService getCategoryService() { return categoryService; }
-
-    public TransactionService getTransactionService() {
-        return transactionService;
-    }
-
-    // public TagService getTagService() {
-    //     return tagService;
-    // }
-
-    public RecurringExpenseService getRecurringExpenseService() {
-        return recurringExpenseService;
-    }
-
-    public AnalyticsService getAnalyticsService() {
-        return analyticsService;
-    }
+    public TransactionService getTransactionService() { return transactionService; }
+    public TagService getTagService() { return tagService; }
+    public RecurringExpenseService getRecurringExpenseService() { return recurringExpenseService; }
+    public AnalyticsService getAnalyticsService() { return analyticsService; }
 
     public void saveLastProfile() {
         profileService.getActiveProfile()
@@ -74,7 +60,7 @@ public class AppContext {
         }
     }
 
-    public void shutdown() {// Persist the active profile ID so the next launch can restore it
+    public void shutdown() {
         saveLastProfile();
         calculatorClient.shutdown();
     }
