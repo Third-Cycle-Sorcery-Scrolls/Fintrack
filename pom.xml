@@ -49,7 +49,7 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>
-                        Main
+                        main.Main
                     </mainClass>
                 </configuration>
             </plugin>

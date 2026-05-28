@@ -1,4 +1,4 @@
-apackage service;
+package service;
 
 import model.Category;
 import repository.CategoryRepository;
@@ -54,9 +54,9 @@ public class CategoryService {
     /**
      * Deletes a category by id.
      * @throws IllegalArgumentException if category not found or wrong profile
-     * @throws RuntimeException if database operation fails
+     * @throws RuntimeException         if database operation fails
      */
-    public void deleteCategory(int categoryId, int profileId) {
+    public boolean deleteCategory(int categoryId, int profileId) {
         Optional<Category> result = categoryRepository.findById(categoryId);
 
         if (result.isEmpty()) {
@@ -70,6 +70,7 @@ public class CategoryService {
         }
 
         categoryRepository.deleteById(categoryId);
+        return false;
     }
 
     // ── List categories ───────────────────────────────────────────────────────
