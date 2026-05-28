@@ -70,7 +70,11 @@ public class CategoryService {
         }
 
         categoryRepository.deleteById(categoryId);
+<<<<<<< HEAD
         return false;
+=======
+        return true;
+>>>>>>> c0492bd93d65fabe2fb9b9322d18886b7d4a227a
     }
 
     // ── List categories ───────────────────────────────────────────────────────
@@ -82,7 +86,10 @@ public class CategoryService {
     public List<Category> getCategoriesForProfile(int profileId) {
         return categoryRepository.findAllByProfileId(profileId);
     }
-
+    
+    public List<Category> findAll() {
+         return categoryRepository.findAll();
+    }
     // ── Get by id ─────────────────────────────────────────────────────────────
 
     /**

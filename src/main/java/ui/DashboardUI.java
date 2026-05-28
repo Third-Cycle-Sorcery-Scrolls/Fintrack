@@ -16,6 +16,7 @@ import service.RecurringExpenseService;
 public class DashboardUI extends BorderPane {
     private final AppContext appContext;
     private final ProfileSetupUI profileSetupUI;
+    private final CategoryUI categoryUI;
     private final RecurringExpenseUI recurringExpenseUI;
     private final AnalyticsService analyticsService;
     private final ProfileService profileService;
@@ -31,6 +32,7 @@ public class DashboardUI extends BorderPane {
             appContext.saveLastProfile();
             this.setCenter(createHomeView());
         });
+        this.categoryUI = new CategoryUI(appContext.getCategoryService(), appContext.getProfileService());
         this.recurringExpenseUI = new RecurringExpenseUI(recurringExpenseService, profileService);
         buildView();
     }
@@ -57,6 +59,7 @@ public class DashboardUI extends BorderPane {
         Button btnHome      = createNavButton("📊 Dashboard");
         Button btnProfile   = createNavButton("👤 Profile Setup");
         Button btnCategory  = createNavButton("🗂 Categories");
+        Button btnTransaction = createNavButton("💳 Transactions");
         Button btnRecurring = createNavButton("🔄 Recurring Expenses");
 
         btnHome.setOnAction(e      -> this.setCenter(createHomeView()));
@@ -65,10 +68,15 @@ public class DashboardUI extends BorderPane {
         //     CategoryUI categoryUI = new CategoryUI(appContext.getCategoryService(), profileService);
         //     this.setCenter(categoryUI.buildView());
         // });
+        btnTransaction.setOnAction(e -> {
+            TransactionUI transactionUI = new TransactionUI(appContext.getTransactionService(), profileService, appContext.getCategoryService());
+            this.setCenter(transactionUI.buildView());
+        });
+        btnCategory.setOnAction(e  -> this.setCenter(categoryUI.buildView()));
         btnRecurring.setOnAction(e -> this.setCenter(recurringExpenseUI.buildView()));
 
         sidebar.getChildren().addAll(appTitle, appSubtitle, spacer,
-                btnHome, btnProfile, btnCategory, btnRecurring);
+            btnHome, btnProfile, btnCategory, btnTransaction, btnRecurring);
         return sidebar;
     }
 

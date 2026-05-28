@@ -2,63 +2,108 @@ package model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class Transaction {
-    private int id;
-    private int profileId;
-    private int categoryId;
+    private Integer id;
+    private Integer profileId;
+    private LocalDate date;
     private BigDecimal amount;
     private TransactionType type;
     private Currency currency;
+    private Integer categoryId;
     private String description;
-    private LocalDate transactionDate;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public Transaction() {
     }
 
-    public Transaction(int id, int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
+    public Transaction(Integer id,
+                       Integer profileId,
+                       Integer categoryId,
+                       BigDecimal amount,
+                       TransactionType type,
+                       Currency currency,
+                       String description,
+                       LocalDate date) {
+        this(id, profileId, date, amount, type, currency, categoryId, description, LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    public Transaction(Integer profileId,
+                       Integer categoryId,
+                       BigDecimal amount,
+                       TransactionType type,
+                       Currency currency,
+                       String description,
+                       LocalDate date) {
+        this(null, profileId, date, amount, type, currency, categoryId, description, LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    public Transaction(Integer id,
+                       Integer profileId,
+                       LocalDate date,
+                       BigDecimal amount,
+                       TransactionType type,
+                       Currency currency,
+                       Integer categoryId,
+                       String description,
+                       LocalDateTime createdAt,
+                       LocalDateTime updatedAt) {
         this.id = id;
         this.profileId = profileId;
-        this.categoryId = categoryId;
+        this.date = date;
         this.amount = amount;
         this.type = type;
         this.currency = currency;
-        this.description = description;
-        this.transactionDate = transactionDate;
-    }
-
-    public Transaction(int profileId, int categoryId, BigDecimal amount, TransactionType type, Currency currency, String description, LocalDate transactionDate) {
-        this.profileId = profileId;
         this.categoryId = categoryId;
-        this.amount = amount;
-        this.type = type;
-        this.currency = currency;
         this.description = description;
-        this.transactionDate = transactionDate;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
-    public int getId() {
+    public Transaction(Integer profileId,
+                       LocalDate date,
+                       BigDecimal amount,
+                       TransactionType type,
+                       Currency currency,
+                       Integer categoryId,
+                       String description,
+                       LocalDateTime createdAt,
+                       LocalDateTime updatedAt) {
+        this(null, profileId, date, amount, type, currency, categoryId, description, createdAt, updatedAt);
+    }
+
+    public Integer getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
-    public int getProfileId() {
+    public Integer getProfileId() {
         return profileId;
     }
 
-    public void setProfileId(int profileId) {
+    public void setProfileId(Integer profileId) {
         this.profileId = profileId;
     }
 
-    public int getCategoryId() {
-        return categoryId;
+    public LocalDate getDate() {
+        return date;
     }
 
-    public void setCategoryId(int categoryId) {
-        this.categoryId = categoryId;
+    public void setDate(LocalDate date) {
+        this.date = date;
+    }
+
+    public LocalDate getTransactionDate() {
+        return date;
+    }
+
+    public void setTransactionDate(LocalDate transactionDate) {
+        this.date = transactionDate;
     }
 
     public BigDecimal getAmount() {
@@ -85,6 +130,14 @@ public class Transaction {
         this.currency = currency;
     }
 
+    public Integer getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(Integer categoryId) {
+        this.categoryId = categoryId;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -93,16 +146,41 @@ public class Transaction {
         this.description = description;
     }
 
-    public LocalDate getTransactionDate() {
-        return transactionDate;
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 
-    public void setTransactionDate(LocalDate transactionDate) {
-        this.transactionDate = transactionDate;
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     @Override
     public String toString() {
-        return transactionDate + " - " + type + " " + amount + " " + currency + " - " + description;
+        StringBuilder builder = new StringBuilder();
+        builder.append(date)
+                .append(" - ")
+                .append(type)
+                .append(' ')
+                .append(amount)
+                .append(' ')
+                .append(currency);
+
+        if (categoryId != null) {
+            builder.append(" - category #").append(categoryId);
+        }
+
+        if (description != null && !description.isBlank()) {
+            builder.append(" - ").append(description.trim());
+        }
+
+        return builder.toString();
     }
 }
