@@ -1,4 +1,4 @@
-apackage service;
+package service;
 
 import model.Category;
 import repository.CategoryRepository;
@@ -81,7 +81,10 @@ public class CategoryService {
     public List<Category> getCategoriesForProfile(int profileId) {
         return categoryRepository.findAllByProfileId(profileId);
     }
-
+    
+    public List<Category> findAll() {
+         return categoryRepository.findAll();
+    }
     // ── Get by id ─────────────────────────────────────────────────────────────
 
     /**
