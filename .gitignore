@@ -1,8 +1,5 @@
 .vscode/
+.idea/
 bin/
 target/
-<<<<<<< HEAD
-.idea
-=======
-**/*class
->>>>>>> 4b82630577a3dcd50eea420c85b93acf21acac5a
+**/*.class

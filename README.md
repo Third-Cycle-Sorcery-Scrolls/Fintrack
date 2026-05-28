@@ -1,24 +1,62 @@
 # Fintrack
 
-
 Fintrack is a JavaFX desktop app for personal finance tracking.
 
 ## Prerequisites
-- Java **21+** (LTS recommended)
+- Java **25+**
 - Maven **3.9+**
-- PostgreSQL running locally (default expected DB: `finance_tracker`)
+- PostgreSQL running locally or reachable over the network
 
 ## Database setup
-1. Create database:
+1. Create the database:
    ```sql
    CREATE DATABASE finance_tracker;
    ```
-2. Update credentials in `src/main/java/config/DBConnection.java` if needed.
+2. Load the schema from `db.sql` into that database. For a local PostgreSQL install, one common command is:
+   ```bash
+   psql -U postgres -d finance_tracker -f db.sql
+   ```
+3. Configure the app with your local PostgreSQL credentials.
 
-Default values currently used:
-- URL: `jdbc:postgresql://localhost:5432/finance_tracker`
-- USER: `postgres`
-- PASSWORD: `password`
+## Database configuration
+The app reads database settings from Java system properties first, then environment variables, then defaults.
+
+| Setting | System property / environment variable | Default |
+| --- | --- | --- |
+| Full JDBC URL | `DB_URL` | _(unset)_ |
+| Database name | `DB_NAME` | `finance_tracker` |
+| Host | `DB_HOST` | `localhost` |
+| Port | `DB_PORT` | `5432` |
+| User | `DB_USER` | `postgres` |
+| Password | `DB_PASSWORD` | `password` |
+
+If `DB_URL` is set, it overrides `DB_NAME`, `DB_HOST`, and `DB_PORT`.
+
+### Option A: run with environment variables
+```bash
+DB_NAME=finance_tracker \
+DB_USER=postgres \
+DB_PASSWORD=your_password \
+mvn clean javafx:run
+```
+
+### Option B: run with Maven settings
+1. Copy `settings.xml.example` to your Maven settings file:
+   - Windows: `C:\Users\<you>\.m2\settings.xml`
+   - macOS/Linux: `~/.m2/settings.xml`
+2. Update `<db.user>` and `<db.password>` for your machine.
+3. Run:
+   ```bash
+   mvn clean javafx:run
+   ```
+
+### Option C: pass Maven properties inline
+```bash
+mvn clean javafx:run \
+  -Ddb.name=finance_tracker \
+  -Ddb.user=postgres \
+  -Ddb.password=your_password
+```
 
 ## Run with Maven
 ```bash
@@ -42,12 +80,15 @@ If Maven cannot fetch plugins/dependencies from Maven Central:
   mvn -U clean compile
   ```
 
-### 2) DB connection shows "Not connected"
+### 2) DB connection fails
 - Ensure PostgreSQL is running.
-- Ensure database/user/password match `DBConnection` values.
+- Ensure the `finance_tracker` database exists.
+- Ensure `db.sql` has been loaded.
+- Ensure `DB_USER`/`DB_PASSWORD` or Maven `<db.user>`/`<db.password>` match your PostgreSQL user.
+- If PostgreSQL is not on `localhost:5432`, set `DB_HOST` and `DB_PORT`, or set a full `DB_URL` such as `jdbc:postgresql://localhost:5432/finance_tracker`.
 
 ## Current module structure
 - `main/Main.java` → JavaFX app entrypoint
 - `ui/DashboardUI.java` → Dashboard shell and integration surface
-- `service/AnalyticsService.java` → Dashboard summary provider (stub until module integration)
+- `service/AnalyticsService.java` → Dashboard summary provider
 - `config/DBConnection.java` → DB connection utility
