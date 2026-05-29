@@ -161,7 +161,7 @@ public class DashboardUI extends BorderPane {
             currencyLabel.getStyleClass().add("section-subtitle");
 
             profileInfo.getChildren().addAll(profileLabel, currencyLabel);
-            container.getChildren().addAll(statsGrid, profileInfo, createRemoteBalanceCard(transactions));
+            container.getChildren().addAll(statsGrid, profileInfo, createRemoteBalanceCard(transactions), createNetworkAuditCard(profile));
         } catch (IllegalStateException ex) {
             Label noProfile = new Label("⚠️ No active profile. Go to Profile Setup to create or select one.");
             noProfile.getStyleClass().add("section-subtitle");
@@ -202,6 +202,41 @@ public class DashboardUI extends BorderPane {
         });
 
         card.getChildren().addAll(title, description, runButton, result);
+        return card;
+    }
+
+    private VBox createNetworkAuditCard(Profile profile) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add("card");
+
+        Label title = new Label("File + Socket Audit");
+        title.getStyleClass().add("section-title");
+
+        Label description = new Label("Checks the local RMI registry with a TCP socket and appends the result to a local audit file.");
+        description.getStyleClass().add("section-subtitle");
+
+        Label result = new Label("Audit log: " + appContext.getNetworkAuditService().getAuditLogPath());
+        result.getStyleClass().add("section-subtitle");
+
+        Button auditButton = new Button("Run Socket Audit");
+        auditButton.getStyleClass().add("nav-button");
+        auditButton.setOnAction(e -> {
+            auditButton.setDisable(true);
+            result.setText("Checking the socket and writing the audit file...");
+
+            appContext.getNetworkAuditService()
+                    .auditSocketAsync("localhost", 1099, profile.getName())
+                    .whenComplete((auditResult, error) -> Platform.runLater(() -> {
+                        auditButton.setDisable(false);
+                        if (error != null) {
+                            result.setText("Socket audit failed: " + rootMessage(error));
+                        } else {
+                            result.setText(auditResult.summary());
+                        }
+                    }));
+        });
+
+        card.getChildren().addAll(title, description, auditButton, result);
         return card;
     }
 
