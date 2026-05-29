@@ -51,7 +51,7 @@ public class ProfileSetupUI {
         refreshProfileList(profileBox);
 
         Button useProfileButton    = createButton("✓ Use Selected",    "button");
-        Button editProfileButton   = createButton("✏ Edit Selected",   "button");
+        Button editProfileButton = createButton("✏ Edit Selected", "button-warning");
         Button deleteProfileButton = createButton("🗑 Delete Selected", "button-danger");
 
         useProfileButton.setOnAction(e -> {
