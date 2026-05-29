@@ -8,9 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository for Tag — plain SQL only, no business logic.
- */
 public class TagRepository implements Repository<Tag, Integer> {
 
     // ── save ──────────────────────────────────────────────────────────────────
