@@ -1,6 +1,7 @@
 package ui;
 
 import app.AppContext;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -160,7 +161,7 @@ public class DashboardUI extends BorderPane {
             currencyLabel.getStyleClass().add("section-subtitle");
 
             profileInfo.getChildren().addAll(profileLabel, currencyLabel);
-            container.getChildren().addAll(statsGrid, profileInfo);
+            container.getChildren().addAll(statsGrid, profileInfo, createRemoteBalanceCard(transactions));
         } catch (IllegalStateException ex) {
             Label noProfile = new Label("⚠️ No active profile. Go to Profile Setup to create or select one.");
             noProfile.getStyleClass().add("section-subtitle");
@@ -168,6 +169,48 @@ public class DashboardUI extends BorderPane {
         }
 
         return container;
+    }
+
+    private VBox createRemoteBalanceCard(List<Transaction> transactions) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add("card");
+
+        Label title = new Label("Network + Threading Demo");
+        title.getStyleClass().add("section-title");
+
+        Label description = new Label("Calculates net balance through the local RMI calculator on a background thread.");
+        description.getStyleClass().add("section-subtitle");
+
+        Label result = new Label("Click the button to run the remote calculation.");
+        result.getStyleClass().add("section-subtitle");
+
+        Button runButton = new Button("Calculate Balance via RMI");
+        runButton.getStyleClass().add("nav-button");
+        runButton.setOnAction(e -> {
+            runButton.setDisable(true);
+            result.setText("Contacting RMI calculator in the background...");
+
+            analyticsService.calculateRemoteBalance(transactions, appContext.getCalculatorClient())
+                    .whenComplete((balance, error) -> Platform.runLater(() -> {
+                        runButton.setDisable(false);
+                        if (error != null) {
+                            result.setText("Remote calculation failed: " + rootMessage(error));
+                        } else {
+                            result.setText(String.format("Remote net balance: %.2f", balance));
+                        }
+                    }));
+        });
+
+        card.getChildren().addAll(title, description, runButton, result);
+        return card;
+    }
+
+    private String rootMessage(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 
     private HBox createStatCard(String label, String value) {

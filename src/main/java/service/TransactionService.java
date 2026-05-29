@@ -173,7 +173,7 @@ public class TransactionService {
 
         // Remove all existing assignments
         for (Tag existing : tagService.getTagsForTransaction(transactionId)) {
-            tagService.removeTag(transactionId, existing.getId());
+            tagService.removeTag(transactionId, existing.getId(), profileId);
         }
         // Assign new ones (validateing profile ownership)
         for (int tagId : tagIds) {

@@ -17,18 +17,20 @@ public class TagRepository implements Repository<Tag, Integer> {
 
     @Override
     public Tag save(Tag tag) {
-        String sql = "INSERT INTO tags (profile_id, name) VALUES (?, ?)";
+        String sql = "INSERT INTO tags (profile_id, name) VALUES (?, ?) RETURNING id, created_at";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, tag.getProfileId());
             stmt.setString(2, tag.getName());
-            stmt.executeUpdate();
 
-            ResultSet keys = stmt.getGeneratedKeys();
-            if (keys.next()) {
-                tag.setId(keys.getInt(1));
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    tag.setId(rs.getInt("id"));
+                    Timestamp createdAt = rs.getTimestamp("created_at");
+                    tag.setCreatedAt(createdAt == null ? null : createdAt.toLocalDateTime());
+                }
             }
             return tag;
 
@@ -149,18 +151,43 @@ public class TagRepository implements Repository<Tag, Integer> {
 
     // ── assignTagToTransaction ────────────────────────────────────────────────
 
-    public void assignTagToTransaction(int transactionId, int tagId) {
-        String sql = "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
+    public void assignTagToTransaction(int transactionId, int tagId, int profileId) {
+        String sql = """
+                INSERT INTO transaction_tags (transaction_id, tag_id)
+                SELECT tx.id, tag.id
+                FROM transactions tx
+                JOIN tags tag ON tag.id = ? AND tag.profile_id = tx.profile_id
+                WHERE tx.id = ? AND tx.profile_id = ?
+                ON CONFLICT DO NOTHING
+                """;
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, tagId);
+            stmt.setInt(2, transactionId);
+            stmt.setInt(3, profileId);
+            stmt.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to assign tag to transaction: " + e.getMessage(), e);
+        }
+    }
+
+    public boolean transactionBelongsToProfile(int transactionId, int profileId) {
+        String sql = "SELECT 1 FROM transactions WHERE id = ? AND profile_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, transactionId);
-            stmt.setInt(2, tagId);
-            stmt.executeUpdate();
+            stmt.setInt(2, profileId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
 
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to assign tag to transaction: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to check transaction profile: " + e.getMessage(), e);
         }
     }
 

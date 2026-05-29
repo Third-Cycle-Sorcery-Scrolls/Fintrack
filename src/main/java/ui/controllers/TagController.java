@@ -125,8 +125,9 @@ public class TagController {
         removeButton.setOnAction(e -> {
             try {
                 Tag selected = requireSelected();
+                Profile profile = profileService.requireActiveProfile();
                 int txId = parseTransactionId(transactionIdField.getText());
-                tagService.removeTag(txId, selected.getId());
+                tagService.removeTag(txId, selected.getId(), profile.getId());
                 output("Tag \"" + selected.getName() + "\" removed from transaction #" + txId + ".");
             } catch (IllegalArgumentException | IllegalStateException ex) {
                 output(ex.getMessage());

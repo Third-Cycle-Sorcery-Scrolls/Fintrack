@@ -77,20 +77,23 @@ public class TagService {
     // ── assignTag ─────────────────────────────────────────────────────────────
 
     /**
-     * Assigns a tag to a transaction. Silently ignores duplicate assignments.
-     * @throws IllegalArgumentException if tag not found or wrong profile
+     * Assigns a tag to a transaction in the same profile. Silently ignores duplicate assignments.
+     * @throws IllegalArgumentException if tag or transaction is not found for this profile
      */
     public void assignTag(int transactionId, int tagId, int profileId) {
         requireTag(tagId, profileId);
-        tagRepository.assignTagToTransaction(transactionId, tagId);
+        requireTransaction(transactionId, profileId);
+        tagRepository.assignTagToTransaction(transactionId, tagId, profileId);
     }
 
     // ── removeTag ─────────────────────────────────────────────────────────────
 
     /**
-     * Removes a tag from a transaction.
+     * Removes a tag from a transaction in the same profile.
      */
-    public void removeTag(int transactionId, int tagId) {
+    public void removeTag(int transactionId, int tagId, int profileId) {
+        requireTag(tagId, profileId);
+        requireTransaction(transactionId, profileId);
         tagRepository.removeTagFromTransaction(transactionId, tagId);
     }
 
@@ -119,6 +122,13 @@ public class TagService {
             throw new IllegalArgumentException("Tag name cannot be empty.");
         }
         return name.trim();
+    }
+
+    private void requireTransaction(int transactionId, int profileId) {
+        if (!tagRepository.transactionBelongsToProfile(transactionId, profileId)) {
+            throw new IllegalArgumentException(
+                "Transaction with id=" + transactionId + " was not found for this profile.");
+        }
     }
 
     private Tag requireTag(int tagId, int profileId) {

@@ -3,6 +3,7 @@ package config;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class DBConnection {
     private static final String DEFAULT_HOST = "localhost";
@@ -21,13 +22,22 @@ public class DBConnection {
         if (connection == null || connection.isClosed()) {
             try {
                 connection = DriverManager.getConnection(URL, USER, PASSWORD);
-                System.out.println("Database connected: " + URL + " as " + USER);
             } catch (SQLException e) {
                 throw new SQLException(
                         "Could not connect to database at " + URL + " as user '" + USER + "'. "
                                 + "Check PostgreSQL is running and set DB_URL or DB_NAME/DB_HOST/DB_PORT/DB_USER/DB_PASSWORD.",
                         e);
             }
+
+            try {
+                initializeSchema(connection);
+            } catch (SQLException e) {
+                closeQuietly(connection);
+                connection = null;
+                throw new SQLException("Could not initialize required database schema updates.", e);
+            }
+
+            System.out.println("Database connected: " + URL + " as " + USER);
         }
         return connection;
     }
@@ -37,6 +47,25 @@ public class DBConnection {
             connection.close();
             connection = null;
             System.out.println("Database connection closed.");
+        }
+    }
+
+    private static void closeQuietly(Connection connection) {
+        try {
+            if (connection != null) {
+                connection.close();
+            }
+        } catch (SQLException ignored) {
+            // Preserve the original schema initialization error.
+        }
+    }
+
+    private static void initializeSchema(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    ALTER TABLE IF EXISTS tags
+                    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                    """);
         }
     }
 
