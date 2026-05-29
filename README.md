@@ -13,6 +13,7 @@ Fintrack is a JavaFX desktop application for managing personal finances across o
 - [Configuration](#configuration)
 - [Running the application](#running-the-application)
 - [Network and threading demo](#network-and-threading-demo)
+- [Project review](#project-review)
 - [Development workflow](#development-workflow)
 - [Troubleshooting](#troubleshooting)
 - [Notes for coursework review](#notes-for-coursework-review)
@@ -31,6 +32,7 @@ Main features include:
   - Show a financial overview for the active profile.
   - Summarize transaction count, category count, recurring expense count, and net balance.
   - Run the RMI-based network/threading demo from the dashboard.
+  - Run a socket audit that checks the local RMI port and appends the result to a local file.
 - **Categories**
   - Manage per-profile transaction categories.
   - Enforce unique category names within each profile.
@@ -55,7 +57,8 @@ Main features include:
 | Build tool | Maven |
 | Database | PostgreSQL |
 | Database access | JDBC with the PostgreSQL driver |
-| Networking demo | Java RMI |
+| Networking demo | Java RMI plus a direct TCP socket audit |
+| File I/O demo | Java NIO file append to `~/.fintrack/network-audit.log` |
 | Threading demo | Java `Thread`, `ExecutorService`, and `CompletableFuture` |
 
 ## Project structure
@@ -85,7 +88,7 @@ Fintrack/
 
 - **`model`**: Defines the core data objects such as `Profile`, `Transaction`, `Category`, `Tag`, and `RecurringExpense`.
 - **`repository`**: Contains SQL/JDBC code only. Repositories load, insert, update, and delete rows.
-- **`service`**: Contains validation and business rules. For example, tag operations verify profile ownership before repository writes.
+- **`service`**: Contains validation and business rules. For example, tag operations verify profile ownership before repository writes; `NetworkAuditService` performs the file/socket audit off the UI thread.
 - **`ui`**: Builds JavaFX screens and handles user interaction.
 - **`app.AppContext`**: Creates repositories/services once, wires shared dependencies, restores the active profile, and shuts down background resources.
 - **`remote`**: Hosts and calls the RMI calculator used by the network/threading demo.
@@ -257,6 +260,31 @@ This project includes a small, intentionally simple Java RMI feature to satisfy 
 
 The displayed remote balance should match the dashboard net balance.
 
+### File + socket audit
+
+The dashboard also includes a **File + Socket Audit** card. Clicking **Run Socket Audit** opens a direct TCP socket to `localhost:1099`, records whether the RMI registry port is reachable, and appends a timestamped audit entry to:
+
+```text
+~/.fintrack/network-audit.log
+```
+
+This small feature demonstrates two additional integration points without changing stored financial data:
+
+- **Network socket:** `service.NetworkAuditService` uses `java.net.Socket` with a connection timeout.
+- **File I/O:** the same service creates the audit directory if needed and appends UTF-8 log lines with Java NIO.
+- **Threading:** audit work runs on a daemon single-thread executor, and the dashboard updates through `Platform.runLater(...)`.
+
+## Project review
+
+The project is well separated into UI, service, repository, model, and remote packages, which makes the application easy to extend. The service layer is the right place for cross-cutting features like the new network audit because it can be triggered from the UI while keeping socket and file details outside JavaFX controls. The existing RMI demo already covers remote invocation; the added socket audit complements it by showing a lower-level connectivity check and persistent local evidence of the check.
+
+Recommended future improvements:
+
+- Add automated unit tests around service validation and repository mapping.
+- Move RMI host/port values into configuration so development machines can avoid port conflicts.
+- Add a small log viewer or export button for audit entries if the audit file becomes part of normal user support.
+- Consider dependency injection for services if the application continues to grow.
+
 ## Development workflow
 
 ### Compile
@@ -284,6 +312,7 @@ mvn clean javafx:run
 - Create income and expense transactions, then confirm dashboard totals update.
 - Assign tags to a transaction and confirm tags stay scoped to the active profile.
 - Click **Calculate Balance via RMI** and confirm the UI remains responsive while the calculation runs.
+- Click **Run Socket Audit** and confirm `~/.fintrack/network-audit.log` receives a new timestamped entry.
 
 ## Troubleshooting
 
@@ -332,4 +361,5 @@ New databases created from `db.sql` include `tags.created_at`. For older local d
 - The UI is JavaFX-based and can be reviewed from `src/main/java/ui`.
 - Core business validation is in `src/main/java/service`.
 - JDBC persistence code is in `src/main/java/repository`.
-- Network and threading examples are in `src/main/java/remote`, `service.AnalyticsService`, and the dashboard's RMI button handler.
+- Network and threading examples are in `src/main/java/remote`, `service.AnalyticsService`, `service.NetworkAuditService`, and the dashboard button handlers.
+- File I/O is demonstrated by the socket audit log at `~/.fintrack/network-audit.log`.

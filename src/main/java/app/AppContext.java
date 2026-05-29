@@ -10,6 +10,7 @@ import repository.TagRepository;
 import repository.TransactionRepository;
 import service.AnalyticsService;
 import service.CategoryService;
+import service.NetworkAuditService;
 import service.ProfileService;
 import service.RecurringExpenseService;
 import service.TagService;
@@ -37,6 +38,7 @@ public class AppContext {
     }
     private final RecurringExpenseService recurringExpenseService = new RecurringExpenseService(recurringExpenseRepository);
     private final AnalyticsService analyticsService = new AnalyticsService();
+    private final NetworkAuditService networkAuditService = new NetworkAuditService();
 
     public CalculatorClient getCalculatorClient() { return calculatorClient; }
     public ProfileService getProfileService() { return profileService; }
@@ -45,6 +47,7 @@ public class AppContext {
     public TagService getTagService() { return tagService; }
     public RecurringExpenseService getRecurringExpenseService() { return recurringExpenseService; }
     public AnalyticsService getAnalyticsService() { return analyticsService; }
+    public NetworkAuditService getNetworkAuditService() { return networkAuditService; }
 
     public void saveLastProfile() {
         profileService.getActiveProfile()
@@ -69,5 +72,6 @@ public class AppContext {
     public void shutdown() {
         saveLastProfile();
         calculatorClient.shutdown();
+        networkAuditService.shutdown();
     }
 }
